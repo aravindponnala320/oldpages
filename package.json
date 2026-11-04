@@ -1,0 +1,41 @@
+{
+  "name": "oldpages",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "npm@11.7.0",
+  "workspaces": [
+    "apps/web",
+    "apps/admin",
+    "packages/api-client",
+    "packages/shared-types",
+    "packages/validation",
+    "packages/design-tokens",
+    "packages/config"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "e2e": "npm run e2e --workspaces --if-present",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.18.0",
+    "@next/eslint-plugin-next": "^16.2.9",
+    "@playwright/test": "^1.49.1",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
+    "@types/node": "^22.10.7",
+    "@types/react": "^19.0.7",
+    "@types/react-dom": "^19.0.3",
+    "@vitejs/plugin-react": "^6.0.2",
+    "eslint": "^9.18.0",
+    "jsdom": "^25.0.1",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.20.0",
+    "vitest": "^4.1.9"
+  }
+}

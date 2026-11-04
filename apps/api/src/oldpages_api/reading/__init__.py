@@ -1,0 +1,1 @@
+"""Reading tracker domain module."""

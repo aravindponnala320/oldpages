@@ -1,0 +1,3 @@
+from oldpages_api.identity.events import USER_BLOCKED, USER_PROFILE_UPDATED, USER_UNBLOCKED
+
+__all__ = ["USER_BLOCKED", "USER_PROFILE_UPDATED", "USER_UNBLOCKED"]

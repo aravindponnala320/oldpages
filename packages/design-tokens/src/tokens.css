@@ -1,0 +1,19 @@
+:root {
+  --op-color-accent: #2563eb;
+  --op-color-attention: #f59e0b;
+  --op-color-canvas: #f5f6f8;
+  --op-color-danger: #dc2626;
+  --op-color-ink: #111827;
+  --op-color-muted: #6b7280;
+  --op-color-panel: #ffffff;
+  --op-color-rule: #eef0f3;
+  --op-color-sky: #2563eb;
+  --op-radius-md: 10px;
+  --op-radius-sm: 6px;
+  --op-space-1: 0.25rem;
+  --op-space-2: 0.5rem;
+  --op-space-3: 0.75rem;
+  --op-space-4: 1rem;
+  --op-space-6: 1.5rem;
+  --op-space-8: 2rem;
+}

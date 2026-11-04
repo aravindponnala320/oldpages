@@ -1,0 +1,9 @@
+.venv
+node_modules
+**/.next
+**/coverage
+playwright-report
+test-results
+docs/api/openapi.json
+docs/CODEX_IMPLEMENTATION_PLAN.md
+docs/OLDPAGES_MASTER_BLUEPRINT.md

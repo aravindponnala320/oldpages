@@ -1,0 +1,19 @@
+{
+  "name": "@oldpages/api-client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@oldpages/shared-types": "0.0.0",
+    "@oldpages/validation": "0.0.0"
+  }
+}

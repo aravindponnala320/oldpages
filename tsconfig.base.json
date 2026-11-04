@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "allowJs": false,
+    "baseUrl": ".",
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "noEmit": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noUncheckedIndexedAccess": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "ES2022",
+    "paths": {
+      "@oldpages/api-client": ["packages/api-client/src/index.ts"],
+      "@oldpages/config": ["packages/config/src/index.ts"],
+      "@oldpages/design-tokens": ["packages/design-tokens/src/index.ts"],
+      "@oldpages/shared-types": ["packages/shared-types/src/index.ts"],
+      "@oldpages/validation": ["packages/validation/src/index.ts"]
+    }
+  }
+}

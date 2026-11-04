@@ -1,0 +1,196 @@
+name: oldpages
+
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_DB: oldpages
+      POSTGRES_PASSWORD: oldpages
+      POSTGRES_USER: oldpages
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U oldpages -d oldpages"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    logging:
+      driver: "none"
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    logging:
+      driver: "none"
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+
+  minio:
+    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: oldpages
+      MINIO_ROOT_PASSWORD: oldpages-secret
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    logging:
+      driver: "none"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+
+  minio-init:
+    image: minio/mc:RELEASE.2024-11-21T17-21-54Z
+    depends_on:
+      minio:
+        condition: service_healthy
+    logging:
+      driver: "none"
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 oldpages oldpages-secret &&
+      mc mb --ignore-existing local/oldpages-media
+      "
+
+  api:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/api.Dockerfile
+    command:
+      [
+        "uvicorn",
+        "oldpages_api.main:create_app",
+        "--factory",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000",
+        "--no-access-log",
+      ]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      OLDPAGES_DATABASE_URL: postgresql+asyncpg://oldpages:oldpages@postgres:5432/oldpages
+      OLDPAGES_REDIS_URL: redis://redis:6379/0
+      OLDPAGES_CORS_ORIGINS: "http://localhost:3000,http://localhost:3001,http://localhost:5173"
+      OLDPAGES_OBJECT_STORAGE_ENDPOINT: http://minio:9000
+      OLDPAGES_OBJECT_STORAGE_BUCKET: oldpages-media
+      OLDPAGES_OBJECT_STORAGE_ACCESS_KEY: oldpages
+      OLDPAGES_OBJECT_STORAGE_SECRET_KEY: oldpages-secret
+      OLDPAGES_OTEL_ENABLED: "false"
+      OLDPAGES_ACCESS_TOKEN_EXPIRE_MINUTES: "1440"
+      # Location / geo (see infrastructure/geoip/README.md for GeoLite2 setup).
+      OLDPAGES_GEOIP_MMDB_PATH: ${OLDPAGES_GEOIP_MMDB_PATH:-/geoip/GeoLite2-City.mmdb}
+      OLDPAGES_NOMINATIM_BASE_URL: ${OLDPAGES_NOMINATIM_BASE_URL:-https://nominatim.openstreetmap.org}
+      OLDPAGES_NOMINATIM_USER_AGENT: "OldPages.in dev (contact@oldpages.in)"
+    logging:
+      driver: "none"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./apps/api:/app/apps/api
+      - ./infrastructure/geoip:/geoip:ro
+
+  worker:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/api.Dockerfile
+    command: ["python", "-m", "oldpages_api.worker"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      OLDPAGES_DATABASE_URL: postgresql+asyncpg://oldpages:oldpages@postgres:5432/oldpages
+      OLDPAGES_REDIS_URL: redis://redis:6379/0
+      OLDPAGES_OTEL_ENABLED: "false"
+    logging:
+      driver: "none"
+    volumes:
+      - ./apps/api:/app/apps/api
+
+  web:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/node.Dockerfile
+      args:
+        APP_DIR: apps/web
+    command:
+      [
+        "npm",
+        "run",
+        "dev",
+        "--workspace",
+        "apps/web",
+        "--",
+        "--hostname",
+        "0.0.0.0",
+        "--port",
+        "3000",
+      ]
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+      API_BASE_URL: http://api:8000
+    logging:
+      driver: "none"
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - web-node-modules:/app/node_modules
+
+  admin:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/node.Dockerfile
+      args:
+        APP_DIR: apps/admin
+    command:
+      [
+        "npm",
+        "run",
+        "dev",
+        "--workspace",
+        "apps/admin",
+        "--",
+        "--hostname",
+        "0.0.0.0",
+        "--port",
+        "3001",
+      ]
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+    logging:
+      driver: "none"
+    ports:
+      - "3001:3001"
+    volumes:
+      - .:/app
+      - admin-node-modules:/app/node_modules
+
+volumes:
+  minio-data:
+  web-node-modules:
+  admin-node-modules:
+  postgres-data:
+  redis-data:

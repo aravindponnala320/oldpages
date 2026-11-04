@@ -1,0 +1,22 @@
+{
+  "name": "@oldpages/admin",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "next build",
+    "dev": "next dev",
+    "e2e": "playwright test",
+    "lint": "eslint . --max-warnings=0",
+    "start": "next start",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@oldpages/config": "0.0.0",
+    "@oldpages/design-tokens": "0.0.0",
+    "next": "^16.2.9",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  }
+}

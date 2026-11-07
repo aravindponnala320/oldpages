@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     debug: bool = False
     environment: Literal["local", "test", "staging", "production"] = "local"
     email_verification_token_hours: int = 24
+    email_provider: Literal["resend", "noop"] = "noop"
+    email_from: str = "OldPages <noreply@oldpages.in>"
+    resend_api_key: SecretStr | None = None
+    public_web_url: str = "http://localhost:3000"
+    google_client_id: str | None = None
     expose_development_auth_tokens: bool = True
     jwt_algorithm: str = "HS256"
     jwt_secret_key: SecretStr = SecretStr("development-only-change-me")

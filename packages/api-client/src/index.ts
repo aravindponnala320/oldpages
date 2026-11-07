@@ -332,6 +332,41 @@ export class OldPagesApiClient {
     return authResponseSchema.parse(response);
   }
 
+  async forgotPassword(email: string): Promise<void> {
+    await this.request<unknown>("/api/v1/auth/forgot-password", {
+      body: JSON.stringify({ email }),
+      method: "POST",
+    });
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    await this.request<unknown>("/api/v1/auth/reset-password", {
+      body: JSON.stringify({ token, new_password: newPassword }),
+      method: "POST",
+    });
+  }
+
+  async verifyEmail(token: string): Promise<void> {
+    await this.request<unknown>("/api/v1/auth/verify-email", {
+      body: JSON.stringify({ token }),
+      method: "POST",
+    });
+  }
+
+  async oauthLogin(
+    provider: "google" | "apple",
+    idToken: string,
+  ): Promise<AuthResponse> {
+    const response = await this.request<unknown>(
+      `/api/v1/auth/oauth/${provider}`,
+      {
+        body: JSON.stringify({ id_token: idToken }),
+        method: "POST",
+      },
+    );
+    return authResponseSchema.parse(response);
+  }
+
   async getMe(accessToken: string): Promise<UserPrivateResponse> {
     const response = await this.request<unknown>("/api/v1/users/me", {
       accessToken,

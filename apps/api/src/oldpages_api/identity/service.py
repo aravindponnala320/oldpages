@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
@@ -9,6 +10,7 @@ import jwt
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from oldpages_api.core.config import Settings
+from oldpages_api.email import EmailClient, build_email_client
 from oldpages_api.identity.exceptions import (
     DuplicateAccountError,
     ForbiddenIdentityActionError,
@@ -66,10 +68,16 @@ class SessionIssueResult:
 
 
 class IdentityService:
-    def __init__(self, session: AsyncSession, settings: Settings) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        settings: Settings,
+        email_client: EmailClient | None = None,
+    ) -> None:
         self.repo = IdentityRepository(session)
         self.session = session
         self.settings = settings
+        self.email_client = email_client or build_email_client(settings)
 
     async def register(
         self,
@@ -133,6 +141,7 @@ class IdentityService:
         )
         issue.response.email_verification = self._development_token(verification_token)
         await self.repo.commit()
+        await self._send_verification_email(user.email, verification_token)
         return issue.response
 
     async def register_superuser(
@@ -198,6 +207,7 @@ class IdentityService:
         )
         issue.response.email_verification = self._development_token(verification_token)
         await self.repo.commit()
+        await self._send_verification_email(user.email, verification_token)
         return issue.response
 
     async def login(
@@ -342,6 +352,7 @@ class IdentityService:
                 request_context=context,
             )
             await self.repo.commit()
+            await self._send_password_reset_email(user.email, token)
         return RequestAcceptedResponse(
             accepted=True, development_token=self._development_token(token)
         )
@@ -829,6 +840,27 @@ class IdentityService:
         ):
             return DevelopmentToken(delivery="out_of_band", token=None)
         return DevelopmentToken(delivery="development", token=token)
+
+    async def _send_verification_email(self, email: str, token: str | None) -> None:
+        if token is None:
+            return
+        try:
+            await self.email_client.send_verification(to=email, token=token)
+        except Exception:
+            # Email failures must not prevent account creation; log and continue.
+            logging.getLogger(__name__).exception(
+                "email_verification_send_failed", extra={"email": email}
+            )
+
+    async def _send_password_reset_email(self, email: str, token: str | None) -> None:
+        if token is None:
+            return
+        try:
+            await self.email_client.send_password_reset(to=email, token=token)
+        except Exception:
+            logging.getLogger(__name__).exception(
+                "email_password_reset_send_failed", extra={"email": email}
+            )
 
     def _session_public_id_from_refresh(self, refresh_token: str) -> str:
         if "." not in refresh_token:

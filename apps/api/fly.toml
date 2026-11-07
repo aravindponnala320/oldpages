@@ -1,0 +1,37 @@
+app = "oldpages-api"
+primary_region = "sin"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  OLDPAGES_ENVIRONMENT = "production"
+  OLDPAGES_OTEL_ENABLED = "false"
+  OLDPAGES_DEBUG = "false"
+  OLDPAGES_LOG_LEVEL = "INFO"
+  OLDPAGES_EXPOSE_DEVELOPMENT_AUTH_TOKENS = "false"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+  [http_service.concurrency]
+    type = "requests"
+    hard_limit = 50
+    soft_limit = 25
+
+  [[http_service.checks]]
+    grace_period = "15s"
+    interval = "30s"
+    timeout = "5s"
+    method = "GET"
+    path = "/health/live"
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1

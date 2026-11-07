@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../../contexts/AuthContext";
 import { Button, Input, colors, font, radius } from "../../../components/ui";
+import { GoogleSignInButton } from "../../../components/GoogleSignInButton";
 
 export default function RegisterPage() {
   const { register: registerUser } = useAuth();
@@ -136,6 +137,14 @@ export default function RegisterPage() {
           Create Free Account
         </Button>
       </form>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "20px 0" }}>
+        <div style={{ flex: 1, height: 1, background: colors.borderStrong }} />
+        <span style={{ color: colors.textFaint, fontSize: font.size.sm, fontWeight: font.weight.medium }}>or</span>
+        <div style={{ flex: 1, height: 1, background: colors.borderStrong }} />
+      </div>
+
+      <GoogleSignInButton redirectTo="/dashboard" />
 
       <p style={{ fontSize: font.size.xs, color: colors.textFaint, textAlign: "center", margin: "16px 0 20px", lineHeight: 1.6 }}>
         By creating an account you agree to our{" "}

@@ -12,7 +12,10 @@ __pycache__/
 htmlcov/
 node_modules/
 .next/
+.open-next/
+.wrangler/
 dist/
+*.tsbuildinfo
 coverage/
 playwright-report/
 test-results/

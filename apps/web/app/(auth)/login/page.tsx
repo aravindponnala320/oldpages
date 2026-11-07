@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../../contexts/AuthContext";
 import { Button, Input, colors, font, radius } from "../../../components/ui";
+import { GoogleSignInButton } from "../../../components/GoogleSignInButton";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -97,6 +98,14 @@ export default function LoginPage() {
           Sign In
         </Button>
       </form>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "24px 0" }}>
+        <div style={{ flex: 1, height: 1, background: colors.borderStrong }} />
+        <span style={{ color: colors.textFaint, fontSize: font.size.sm, fontWeight: font.weight.medium }}>or</span>
+        <div style={{ flex: 1, height: 1, background: colors.borderStrong }} />
+      </div>
+
+      <GoogleSignInButton redirectTo="/dashboard" />
 
       <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "24px 0" }}>
         <div style={{ flex: 1, height: 1, background: colors.borderStrong }} />

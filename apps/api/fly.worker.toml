@@ -1,0 +1,20 @@
+app = "oldpages-worker"
+primary_region = "sin"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  OLDPAGES_ENVIRONMENT = "production"
+  OLDPAGES_OTEL_ENABLED = "false"
+  OLDPAGES_DEBUG = "false"
+  OLDPAGES_LOG_LEVEL = "INFO"
+
+[processes]
+  worker = "python -m oldpages_api.worker"
+
+[[vm]]
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1
+  processes = ["worker"]

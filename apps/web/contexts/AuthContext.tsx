@@ -26,6 +26,7 @@ type AuthContextType = {
     email: string,
     password: string,
   ) => Promise<void>;
+  loginWithGoogle: (idToken: string) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -86,6 +87,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
+  const loginWithGoogle = useCallback(async (idToken: string) => {
+    const response = await apiClient.oauthLogin("google", idToken);
+    setTokens(response.tokens.access_token, response.tokens.refresh_token);
+    setUser(response.user);
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -95,6 +102,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         login,
         logout,
         register,
+        loginWithGoogle,
       }}
     >
       {children}

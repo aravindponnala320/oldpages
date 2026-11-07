@@ -12,7 +12,8 @@
   },
   "vars": {
     "NEXT_PUBLIC_API_BASE_URL": "https://oldpages-api.fly.dev",
-    "API_BASE_URL": "https://oldpages-api.fly.dev"
+    "API_BASE_URL": "https://oldpages-api.fly.dev",
+    "NEXT_PUBLIC_GOOGLE_CLIENT_ID": "680039030611-0s3tqfd8lri1c3c068g7pn116umlhmvs.apps.googleusercontent.com"
   },
   "routes": [
     { "pattern": "oldpages.in", "custom_domain": true },

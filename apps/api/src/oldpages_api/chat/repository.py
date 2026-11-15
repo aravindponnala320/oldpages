@@ -14,7 +14,7 @@ from oldpages_api.chat.models import (
     MessageRead,
     MessageReport,
 )
-from oldpages_api.identity.models import User, UserBlock, UserProfile
+from oldpages_api.identity.models import User, UserBlock
 from oldpages_api.listings.models import Listing, MediaAsset
 
 
@@ -66,6 +66,17 @@ class ChatRepository:
             .where(Conversation.public_id == public_id)
         )
         return result.unique().scalar_one_or_none()
+
+    async def conversation_public_ids(self, user_id: int) -> list[str]:
+        result = await self.session.execute(
+            select(Conversation.public_id)
+            .join(ConversationMember)
+            .where(
+                ConversationMember.user_id == user_id,
+                ConversationMember.status.in_(["active", "muted", "archived"]),
+            )
+        )
+        return list(result.scalars().all())
 
     async def list_conversations(
         self,

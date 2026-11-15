@@ -2,29 +2,43 @@ import Link from "next/link";
 import { Icon, colors, font, radius } from "../../components/ui";
 
 const TRUST_POINTS = [
-  { title: "Buy & sell textbooks", body: "Student-friendly prices, verified sellers." },
-  { title: "Exchange nearby",       body: "Swap books directly with readers in your area." },
-  { title: "Donate & discover",     body: "Give books a new life; find rare reads." },
-  { title: "Trusted on campus",     body: "Active on 50+ Indian campuses today." },
+  {
+    title: "Buy & sell textbooks",
+    body: "Student-friendly prices, verified sellers.",
+  },
+  {
+    title: "Exchange nearby",
+    body: "Swap books directly with readers in your area.",
+  },
+  {
+    title: "Donate & discover",
+    body: "Give books a new life; find rare reads.",
+  },
+  { title: "Trusted on campus", body: "Active on 50+ Indian campuses today." },
 ];
 
-export default function AuthLayout({ children }: { children: React.ReactNode }) {
+export default function AuthLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <div
+      className="op-auth-layout"
       style={{
         minHeight: "100vh",
-        display: "grid",
-        gridTemplateColumns: "1fr 1fr",
         background: colors.bg,
         fontFamily: font.family,
       }}
     >
       {/* Brand panel */}
       <aside
+        className="op-auth-brand"
         style={{
           background: `linear-gradient(160deg, ${colors.primaryStrong} 0%, ${colors.primary} 60%, #3b82f6 100%)`,
           color: "#fff",
-          padding: "48px",
+          padding: "clamp(32px, 4vw, 48px)",
+          gap: 32,
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
@@ -35,25 +49,47 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         <div
           aria-hidden
           style={{
-            position: "absolute", inset: 0, opacity: 0.08,
+            position: "absolute",
+            inset: 0,
+            opacity: 0.08,
             backgroundImage:
               "radial-gradient(circle at 20% 30%, white 1px, transparent 1px), radial-gradient(circle at 75% 65%, white 1px, transparent 1px)",
             backgroundSize: "48px 48px",
           }}
         />
-        <Link href="/" style={{ display: "inline-flex", alignItems: "center", gap: 10, textDecoration: "none", position: "relative" }}>
+        <Link
+          href="/"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 10,
+            textDecoration: "none",
+            position: "relative",
+          }}
+        >
           <div
             style={{
-              width: 44, height: 44, borderRadius: radius.lg,
+              width: 44,
+              height: 44,
+              borderRadius: radius.lg,
               background: "rgba(255,255,255,0.16)",
               backdropFilter: "blur(8px)",
               border: "1px solid rgba(255,255,255,0.28)",
-              display: "flex", alignItems: "center", justifyContent: "center",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
             }}
           >
             <Icon.book size={22} color="#fff" />
           </div>
-          <span style={{ color: "#fff", fontWeight: font.weight.heavy, fontSize: font.size["xl"], letterSpacing: "-0.02em" }}>
+          <span
+            style={{
+              color: "#fff",
+              fontWeight: font.weight.heavy,
+              fontSize: font.size["xl"],
+              letterSpacing: "-0.02em",
+            }}
+          >
             OldPages
           </span>
         </Link>
@@ -74,7 +110,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           <h2
             style={{
               color: "#fff",
-              fontSize: font.size["4xl"],
+              fontSize: "clamp(28px, 2.6vw, 36px)",
               fontWeight: font.weight.heavy,
               lineHeight: 1.15,
               margin: "0 0 24px",
@@ -85,22 +121,50 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             <br />
             Find your next read.
           </h2>
-          <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 14 }}>
+          <ul
+            style={{
+              listStyle: "none",
+              padding: 0,
+              margin: 0,
+              display: "flex",
+              flexDirection: "column",
+              gap: 14,
+            }}
+          >
             {TRUST_POINTS.map((p) => (
               <li key={p.title} style={{ display: "flex", gap: 12 }}>
                 <span
                   style={{
-                    width: 32, height: 32, borderRadius: 8,
+                    width: 32,
+                    height: 32,
+                    borderRadius: 8,
                     background: "rgba(255,255,255,0.14)",
-                    display: "inline-flex", alignItems: "center", justifyContent: "center",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                     flexShrink: 0,
                   }}
                 >
                   <Icon.check size={18} color="#fff" />
                 </span>
                 <div>
-                  <div style={{ fontSize: font.size.md, fontWeight: font.weight.semibold, color: "#fff" }}>{p.title}</div>
-                  <div style={{ fontSize: font.size.sm, color: "rgba(255,255,255,0.72)" }}>{p.body}</div>
+                  <div
+                    style={{
+                      fontSize: font.size.md,
+                      fontWeight: font.weight.semibold,
+                      color: "#fff",
+                    }}
+                  >
+                    {p.title}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: font.size.sm,
+                      color: "rgba(255,255,255,0.72)",
+                    }}
+                  >
+                    {p.body}
+                  </div>
                 </div>
               </li>
             ))}
@@ -116,10 +180,29 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             gap: 32,
           }}
         >
-          {[["10K+", "Books listed"], ["50+", "Campuses"], ["₹0", "Platform fee"]].map(([num, label]) => (
+          {[
+            ["10K+", "Books listed"],
+            ["50+", "Campuses"],
+            ["₹0", "Platform fee"],
+          ].map(([num, label]) => (
             <div key={label}>
-              <div style={{ color: "#fff", fontWeight: font.weight.heavy, fontSize: font.size.xl }}>{num}</div>
-              <div style={{ color: "rgba(255,255,255,0.6)", fontSize: font.size.xs }}>{label}</div>
+              <div
+                style={{
+                  color: "#fff",
+                  fontWeight: font.weight.heavy,
+                  fontSize: font.size.xl,
+                }}
+              >
+                {num}
+              </div>
+              <div
+                style={{
+                  color: "rgba(255,255,255,0.6)",
+                  fontSize: font.size.xs,
+                }}
+              >
+                {label}
+              </div>
             </div>
           ))}
         </div>
@@ -132,20 +215,38 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           flexDirection: "column",
           justifyContent: "center",
           alignItems: "center",
-          padding: "48px 32px",
+          padding: "clamp(24px, 6vw, 48px) clamp(16px, 5vw, 32px)",
           background: colors.surface,
           overflowY: "auto",
         }}
       >
-        <div style={{ width: "100%", maxWidth: 440 }}>{children}</div>
+        <div style={{ width: "100%", maxWidth: 440 }}>
+          {/* The brand panel is hidden below 900px, so show the logo above the form. */}
+          <Link
+            href="/"
+            className="op-auth-mobile-brand"
+            style={{
+              alignItems: "center",
+              gap: 10,
+              marginBottom: 28,
+              textDecoration: "none",
+            }}
+          >
+            <Icon.logo size={36} />
+            <span
+              style={{
+                color: colors.text,
+                fontWeight: font.weight.heavy,
+                fontSize: font.size.xl,
+                letterSpacing: "-0.02em",
+              }}
+            >
+              OldPages
+            </span>
+          </Link>
+          {children}
+        </div>
       </main>
-
-      <style>{`
-        @media (max-width: 900px) {
-          div[style*="gridTemplateColumns: 1fr 1fr"] { grid-template-columns: 1fr !important; }
-          aside[style*="linear-gradient"] { display: none !important; }
-        }
-      `}</style>
     </div>
   );
 }

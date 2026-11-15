@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import Link from "next/link";
 import { apiClient } from "../../../lib/api";
 import { getAccessToken } from "../../../lib/auth";
 import { useAuth } from "../../../contexts/AuthContext";
@@ -72,7 +71,9 @@ export default function PublicProfilePage() {
     const token = getAccessToken() ?? undefined;
     Promise.all([
       apiClient.getMe(token ?? "").catch(() => null),
-      apiClient.searchListings({ limit: 12 }, token).catch(() => ({ items: [], result_count: 0, next_cursor: null })),
+      apiClient
+        .searchListings({ seller_id: userId, sort: "newest", limit: 12 }, token)
+        .catch(() => ({ items: [], result_count: 0, next_cursor: null })),
     ])
       .then(([meRes, listingsRes]) => {
         if (meRes && meRes.id === userId) {
@@ -85,7 +86,10 @@ export default function PublicProfilePage() {
             institution: meRes.institution,
           });
         } else {
-          setProfileUser({ id: userId, display_name: `User ${userId.slice(0, 8)}` });
+          setProfileUser({
+            id: userId,
+            display_name: `User ${userId.slice(0, 8)}`,
+          });
         }
         setListings(listingsRes.items);
       })
@@ -103,7 +107,10 @@ export default function PublicProfilePage() {
         setFollowing(false);
         setFollowId(null);
       } else {
-        const res = await apiClient.createFollow({ target_id: userId, target_type: "user" }, token);
+        const res = await apiClient.createFollow(
+          { target_id: userId, target_type: "user" },
+          token,
+        );
         setFollowing(true);
         setFollowId(res.id);
       }
@@ -114,7 +121,14 @@ export default function PublicProfilePage() {
 
   if (loading) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: "60vh",
+        }}
+      >
         <Spinner size="lg" />
       </div>
     );
@@ -124,7 +138,15 @@ export default function PublicProfilePage() {
     return (
       <div style={{ padding: "24px 0" }}>
         <Container>
-          <div style={{ background: colors.dangerSoft, border: `1px solid #fecaca`, color: colors.dangerText, borderRadius: radius.lg, padding: "14px 18px" }}>
+          <div
+            style={{
+              background: colors.dangerSoft,
+              border: `1px solid #fecaca`,
+              color: colors.dangerText,
+              borderRadius: radius.lg,
+              padding: "14px 18px",
+            }}
+          >
             {error ?? "Profile not found"}
           </div>
         </Container>
@@ -147,51 +169,147 @@ export default function PublicProfilePage() {
             boxShadow: shadow.sm,
           }}
         >
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 20, flexWrap: "wrap" }}>
-            <Avatar name={profileUser.display_name} src={profileUser.profile_image_url} size="xl" />
+          <div
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 20,
+              flexWrap: "wrap",
+            }}
+          >
+            <Avatar
+              name={profileUser.display_name}
+              src={profileUser.profile_image_url}
+              size="xl"
+            />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
-                <h1 style={{ margin: 0, fontSize: font.size["2xl"], fontWeight: font.weight.bold, color: colors.text }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  flexWrap: "wrap",
+                  marginBottom: 4,
+                }}
+              >
+                <h1
+                  style={{
+                    margin: 0,
+                    fontSize: font.size["2xl"],
+                    fontWeight: font.weight.bold,
+                    color: colors.text,
+                  }}
+                >
                   {profileUser.display_name}
                 </h1>
                 {profileUser.username && (
-                  <span style={{ color: colors.textFaint, fontSize: font.size.base }}>@{profileUser.username}</span>
+                  <span
+                    style={{
+                      color: colors.textFaint,
+                      fontSize: font.size.base,
+                    }}
+                  >
+                    @{profileUser.username}
+                  </span>
                 )}
                 {profileUser.verification_badges?.map((b) => (
                   <Badge key={b} variant="success" label={b} />
                 ))}
               </div>
               {profileUser.bio && (
-                <p style={{ margin: "8px 0 10px", color: colors.textMuted, lineHeight: font.lineHeight.relaxed, fontSize: font.size.base }}>
+                <p
+                  style={{
+                    margin: "8px 0 10px",
+                    color: colors.textMuted,
+                    lineHeight: font.lineHeight.relaxed,
+                    fontSize: font.size.base,
+                  }}
+                >
                   {profileUser.bio}
                 </p>
               )}
               <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
                 {profileUser.approximate_location && (
-                  <span style={{ fontSize: font.size.sm, color: colors.textFaint, display: "flex", alignItems: "center", gap: 4 }}>
-                    <Icon.pin color={colors.textFaint} /> {profileUser.approximate_location}
+                  <span
+                    style={{
+                      fontSize: font.size.sm,
+                      color: colors.textFaint,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                  >
+                    <Icon.pin color={colors.textFaint} />{" "}
+                    {profileUser.approximate_location}
                   </span>
                 )}
                 {profileUser.institution && (
-                  <span style={{ fontSize: font.size.sm, color: colors.textFaint }}>{profileUser.institution}</span>
+                  <span
+                    style={{ fontSize: font.size.sm, color: colors.textFaint }}
+                  >
+                    {profileUser.institution}
+                  </span>
                 )}
               </div>
             </div>
 
             <div style={{ display: "flex", gap: 24, flexShrink: 0 }}>
               <div style={{ textAlign: "center" }}>
-                <p style={{ margin: 0, fontSize: font.size.xl, fontWeight: font.weight.bold, color: colors.text }}>{listings.length}</p>
-                <p style={{ margin: 0, fontSize: font.size.xs, color: colors.textFaint }}>Listings</p>
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: font.size.xl,
+                    fontWeight: font.weight.bold,
+                    color: colors.text,
+                  }}
+                >
+                  {listings.length}
+                </p>
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: font.size.xs,
+                    color: colors.textFaint,
+                  }}
+                >
+                  Listings
+                </p>
               </div>
               <div style={{ textAlign: "center" }}>
-                <p style={{ margin: 0, fontSize: font.size.xl, fontWeight: font.weight.bold, color: colors.text }}>0</p>
-                <p style={{ margin: 0, fontSize: font.size.xs, color: colors.textFaint }}>Trades</p>
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: font.size.xl,
+                    fontWeight: font.weight.bold,
+                    color: colors.text,
+                  }}
+                >
+                  0
+                </p>
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: font.size.xs,
+                    color: colors.textFaint,
+                  }}
+                >
+                  Trades
+                </p>
               </div>
             </div>
 
-            <div style={{ display: "flex", gap: 8, flexShrink: 0, flexWrap: "wrap" }}>
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                flexShrink: 0,
+                flexWrap: "wrap",
+              }}
+            >
               {isOwnProfile ? (
-                <LinkButton href="/profile/me" variant="secondary" size="sm">Edit Profile</LinkButton>
+                <LinkButton href="/profile/me" variant="secondary" size="sm">
+                  Edit Profile
+                </LinkButton>
               ) : (
                 <>
                   {isAuthenticated && (
@@ -205,7 +323,13 @@ export default function PublicProfilePage() {
                     </Button>
                   )}
                   {isAuthenticated && (
-                    <LinkButton href={`/inbox?user=${userId}`} variant="secondary" size="sm">Message</LinkButton>
+                    <LinkButton
+                      href={`/inbox?user=${userId}`}
+                      variant="secondary"
+                      size="sm"
+                    >
+                      Message
+                    </LinkButton>
                   )}
                 </>
               )}
@@ -224,19 +348,27 @@ export default function PublicProfilePage() {
           />
         </div>
 
-        {activeTab === "listings" && (
-          listings.length === 0 ? (
+        {activeTab === "listings" &&
+          (listings.length === 0 ? (
             <EmptyState
               icon={<Icon.book size={26} color={colors.primary} />}
               title="No active listings"
               description="This user hasn't listed any books yet."
             />
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
-              {listings.map((l) => <BookCard key={l.id} book={toBookCard(l)} />)}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fill, minmax(min(100%, clamp(120px, 22vw, 200px)), 1fr))",
+                gap: 16,
+              }}
+            >
+              {listings.map((l) => (
+                <BookCard key={l.id} book={toBookCard(l)} />
+              ))}
             </div>
-          )
-        )}
+          ))}
 
         {activeTab === "reviews" && (
           <EmptyState

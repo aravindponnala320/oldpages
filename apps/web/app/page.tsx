@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { apiClient } from "../lib/api";
+import {
+  decodeLocationCookie,
+  listingPlaceLabel,
+  nearbyCaption,
+} from "../lib/geo";
 import type { ListingSearchResult } from "@oldpages/shared-types";
 import {
   BookCard,
@@ -19,56 +24,137 @@ import {
 
 /* ─────────── static category configuration (mirrors demo image) ─────────── */
 
-const CATEGORIES: Array<{ name: string; slug: string; color: string; icon: React.ReactNode }> = [
+const CATEGORIES: Array<{
+  name: string;
+  slug: string;
+  color: string;
+  icon: React.ReactNode;
+}> = [
   {
-    name: "School", slug: "school", color: colors.catPink,
+    name: "School",
+    slug: "academic.school",
+    color: colors.catPink,
     icon: (
       <svg width="34" height="34" viewBox="0 0 48 48" fill="none">
-        <path d="M8 40V22l16-10 16 10v18" stroke="#c026d3" strokeWidth="2.5" strokeLinejoin="round" />
-        <path d="M18 40V28h12v12" stroke="#c026d3" strokeWidth="2.5" strokeLinejoin="round" />
-        <path d="M24 4v6M20 6h8" stroke="#c026d3" strokeWidth="2.5" strokeLinecap="round" />
+        <path
+          d="M8 40V22l16-10 16 10v18"
+          stroke="#c026d3"
+          strokeWidth="2.5"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M18 40V28h12v12"
+          stroke="#c026d3"
+          strokeWidth="2.5"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M24 4v6M20 6h8"
+          stroke="#c026d3"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+        />
       </svg>
     ),
   },
   {
-    name: "College", slug: "college", color: colors.catBlue,
+    name: "College",
+    slug: "academic.college",
+    color: colors.catBlue,
     icon: (
       <svg width="34" height="34" viewBox="0 0 48 48" fill="none">
-        <path d="M4 18l20-9 20 9-20 9L4 18z" stroke="#2563eb" strokeWidth="2.5" strokeLinejoin="round" fill="#2563eb" fillOpacity="0.15" />
-        <path d="M12 22v10c0 3 5.5 6 12 6s12-3 12-6V22M42 18v10" stroke="#2563eb" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        <path
+          d="M4 18l20-9 20 9-20 9L4 18z"
+          stroke="#2563eb"
+          strokeWidth="2.5"
+          strokeLinejoin="round"
+          fill="#2563eb"
+          fillOpacity="0.15"
+        />
+        <path
+          d="M12 22v10c0 3 5.5 6 12 6s12-3 12-6V22M42 18v10"
+          stroke="#2563eb"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
       </svg>
     ),
   },
   {
-    name: "Competitive", slug: "competitive", color: colors.catGreen,
+    name: "Competitive",
+    slug: "competitive-exams",
+    color: colors.catGreen,
     icon: (
       <svg width="34" height="34" viewBox="0 0 48 48" fill="none">
-        <path d="M14 6h20v10a10 10 0 01-20 0V6z" stroke="#16a34a" strokeWidth="2.5" strokeLinejoin="round" />
-        <path d="M14 10H8v4a6 6 0 006 6M34 10h6v4a6 6 0 01-6 6" stroke="#16a34a" strokeWidth="2.5" strokeLinejoin="round" />
-        <path d="M20 28h8v6h-8zM14 40h20" stroke="#16a34a" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+        <path
+          d="M14 6h20v10a10 10 0 01-20 0V6z"
+          stroke="#16a34a"
+          strokeWidth="2.5"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M14 10H8v4a6 6 0 006 6M34 10h6v4a6 6 0 01-6 6"
+          stroke="#16a34a"
+          strokeWidth="2.5"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M20 28h8v6h-8zM14 40h20"
+          stroke="#16a34a"
+          strokeWidth="2.5"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
       </svg>
     ),
   },
   {
-    name: "Fiction", slug: "fiction", color: colors.catOrange,
+    name: "Fiction",
+    slug: "fiction",
+    color: colors.catOrange,
     icon: (
       <svg width="34" height="34" viewBox="0 0 48 48" fill="none">
-        <path d="M4 10h16a4 4 0 014 4v24a4 4 0 00-4-4H4V10z" stroke="#ea580c" strokeWidth="2.5" strokeLinejoin="round" />
-        <path d="M44 10H28a4 4 0 00-4 4v24a4 4 0 014-4h16V10z" stroke="#ea580c" strokeWidth="2.5" strokeLinejoin="round" />
+        <path
+          d="M4 10h16a4 4 0 014 4v24a4 4 0 00-4-4H4V10z"
+          stroke="#ea580c"
+          strokeWidth="2.5"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M44 10H28a4 4 0 00-4 4v24a4 4 0 014-4h16V10z"
+          stroke="#ea580c"
+          strokeWidth="2.5"
+          strokeLinejoin="round"
+        />
       </svg>
     ),
   },
   {
-    name: "Non Fiction", slug: "non-fiction", color: colors.catPurple,
+    name: "Self-Help",
+    slug: "self-help",
+    color: colors.catPurple,
     icon: (
       <svg width="34" height="34" viewBox="0 0 48 48" fill="none">
-        <path d="M10 6h24a4 4 0 014 4v32a2 2 0 01-2 2H14a4 4 0 01-4-4V6z" stroke="#7c3aed" strokeWidth="2.5" strokeLinejoin="round" />
-        <path d="M14 38h24" stroke="#7c3aed" strokeWidth="2.5" strokeLinecap="round" />
+        <path
+          d="M10 6h24a4 4 0 014 4v32a2 2 0 01-2 2H14a4 4 0 01-4-4V6z"
+          stroke="#7c3aed"
+          strokeWidth="2.5"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M14 38h24"
+          stroke="#7c3aed"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+        />
       </svg>
     ),
   },
   {
-    name: "Others", slug: "others", color: colors.catYellow,
+    name: "All books",
+    slug: "",
+    color: colors.catYellow,
     icon: (
       <svg width="34" height="34" viewBox="0 0 48 48" fill="none">
         <circle cx="14" cy="14" r="5" stroke="#f59e0b" strokeWidth="2.5" />
@@ -82,7 +168,10 @@ const CATEGORIES: Array<{ name: string; slug: string; color: string; icon: React
 
 /* ─────────── data mapping ─────────── */
 
-function toBookCard(l: ListingSearchResult): BookCardData {
+function toBookCard(
+  l: ListingSearchResult,
+  readerCountry?: string | null,
+): BookCardData {
   return {
     id: l.id,
     href: `/listings/${l.id}`,
@@ -91,10 +180,7 @@ function toBookCard(l: ListingSearchResult): BookCardData {
     imageUrl: l.image_url ?? null,
     priceLabel: formatPrice(l.price_amount_cents, l.currency),
     condition: l.condition ?? null,
-    location:
-      l.distance_km != null
-        ? `${l.distance_km.toFixed(1)} km`
-        : l.location?.city ?? null,
+    location: listingPlaceLabel(l, readerCountry),
   };
 }
 
@@ -110,24 +196,32 @@ export default async function HomePage() {
     const res = await apiClient.searchListings(
       { sort: "newest", limit: 8 },
       undefined,
-      activeLocationCookie ? { "X-User-Location": activeLocationCookie } : undefined,
+      activeLocationCookie
+        ? { "X-User-Location": activeLocationCookie }
+        : undefined,
     );
     listings = res.items;
   } catch {
     listings = [];
   }
 
-  const locationLabel = formatLocationLabel(activeLocation);
+  const nearby = nearbyCaption(activeLocation);
 
   return (
     <>
       {/* Categories */}
-      <section style={{ background: colors.surface, borderBottom: `1px solid ${colors.border}` }}>
+      <section
+        style={{
+          background: colors.surface,
+          borderBottom: `1px solid ${colors.border}`,
+        }}
+      >
         <Container>
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(6, 1fr)",
+              gridTemplateColumns:
+                "repeat(auto-fit, minmax(min(100%, 96px), 1fr))",
               gap: 16,
               padding: "24px 0",
             }}
@@ -136,7 +230,7 @@ export default async function HomePage() {
               <CategoryTile
                 key={cat.slug}
                 name={cat.name}
-                href={`/search?category=${cat.slug}`}
+                href={cat.slug ? `/search?category=${cat.slug}` : "/search"}
                 color={cat.color}
                 icon={cat.icon}
               />
@@ -153,24 +247,62 @@ export default async function HomePage() {
               background: colors.surface,
               border: `1px solid ${colors.border}`,
               borderRadius: radius.xl,
-              padding: "20px 24px 28px",
+              padding:
+                "clamp(14px, 3vw, 20px) clamp(14px, 3vw, 24px) clamp(18px, 3vw, 28px)",
             }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18 }}>
-              <div>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                gap: 12,
+                marginBottom: 18,
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    marginBottom: 4,
+                  }}
+                >
                   <Icon.pin color={colors.text} />
-                  <h2 style={{ margin: 0, fontSize: font.size.xl, fontWeight: font.weight.bold, color: colors.text }}>
+                  <h2
+                    style={{
+                      margin: 0,
+                      fontSize: font.size.xl,
+                      fontWeight: font.weight.bold,
+                      color: colors.text,
+                    }}
+                  >
                     Nearby Books
                   </h2>
                 </div>
-                <p style={{ margin: 0, fontSize: font.size.sm, color: colors.textSubtle }}>
-                  {locationLabel
-                    ? `Showing books near ${locationLabel}`
-                    : "Set your location above to see nearby books"}
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: font.size.sm,
+                    color: colors.textSubtle,
+                  }}
+                >
+                  {nearby ?? "Set your location above to see nearby books"}
                 </p>
               </div>
-              <Link href="/search" style={{ fontSize: font.size.base, fontWeight: font.weight.medium, color: colors.primary, textDecoration: "none" }}>
+              <Link
+                href="/search"
+                className="op-tap"
+                style={{
+                  fontSize: font.size.base,
+                  fontWeight: font.weight.medium,
+                  color: colors.primary,
+                  textDecoration: "none",
+                  whiteSpace: "nowrap",
+                  flexShrink: 0,
+                }}
+              >
                 View all
               </Link>
             </div>
@@ -204,12 +336,16 @@ export default async function HomePage() {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-                  gap: 14,
+                  gridTemplateColumns:
+                    "repeat(auto-fill, minmax(min(100%, clamp(120px, 22vw, 200px)), 1fr))",
+                  gap: "clamp(10px, 2vw, 14px)",
                 }}
               >
                 {listings.map((l) => (
-                  <BookCard key={l.id} book={toBookCard(l)} />
+                  <BookCard
+                    key={l.id}
+                    book={toBookCard(l, activeLocation?.country_code)}
+                  />
                 ))}
               </div>
             )}
@@ -221,7 +357,14 @@ export default async function HomePage() {
       <div style={{ marginTop: 20 }}>
         <Container>
           <Section padded>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fit, minmax(min(100%, 260px), 1fr))",
+                gap: 16,
+              }}
+            >
               <FeatureCard
                 bg={colors.featPurple}
                 title="Sell Your Books"
@@ -230,10 +373,54 @@ export default async function HomePage() {
                 cta={{ label: "Sell Now", href: "/listings/create" }}
                 illustration={
                   <div style={{ position: "relative", width: 60, height: 60 }}>
-                    <div style={{ position: "absolute", bottom: 0, right: 0, width: 56, height: 12, background: "#a78bfa", borderRadius: 2, transform: "rotate(-6deg)" }} />
-                    <div style={{ position: "absolute", bottom: 12, right: 4, width: 50, height: 12, background: "#f472b6", borderRadius: 2, transform: "rotate(4deg)" }} />
-                    <div style={{ position: "absolute", bottom: 24, right: 0, width: 54, height: 12, background: "#c084fc", borderRadius: 2, transform: "rotate(-3deg)" }} />
-                    <div style={{ position: "absolute", bottom: 36, right: 8, width: 44, height: 12, background: "#ec4899", borderRadius: 2, transform: "rotate(6deg)" }} />
+                    <div
+                      style={{
+                        position: "absolute",
+                        bottom: 0,
+                        right: 0,
+                        width: 56,
+                        height: 12,
+                        background: "#a78bfa",
+                        borderRadius: 2,
+                        transform: "rotate(-6deg)",
+                      }}
+                    />
+                    <div
+                      style={{
+                        position: "absolute",
+                        bottom: 12,
+                        right: 4,
+                        width: 50,
+                        height: 12,
+                        background: "#f472b6",
+                        borderRadius: 2,
+                        transform: "rotate(4deg)",
+                      }}
+                    />
+                    <div
+                      style={{
+                        position: "absolute",
+                        bottom: 24,
+                        right: 0,
+                        width: 54,
+                        height: 12,
+                        background: "#c084fc",
+                        borderRadius: 2,
+                        transform: "rotate(-3deg)",
+                      }}
+                    />
+                    <div
+                      style={{
+                        position: "absolute",
+                        bottom: 36,
+                        right: 8,
+                        width: 44,
+                        height: 12,
+                        background: "#ec4899",
+                        borderRadius: 2,
+                        transform: "rotate(6deg)",
+                      }}
+                    />
                   </div>
                 }
               />
@@ -245,8 +432,18 @@ export default async function HomePage() {
                 illustration={
                   <svg width="56" height="56" viewBox="0 0 48 48" fill="none">
                     <path d="M4 20l20-9 20 9-20 9L4 20z" fill="#1e3a8a" />
-                    <path d="M12 24v6c0 2.5 5 5 12 5s12-2.5 12-5v-6" stroke="#1e3a8a" strokeWidth="2.5" fill="#3b82f6" />
-                    <path d="M42 20v9" stroke="#1e3a8a" strokeWidth="2.5" strokeLinecap="round" />
+                    <path
+                      d="M12 24v6c0 2.5 5 5 12 5s12-2.5 12-5v-6"
+                      stroke="#1e3a8a"
+                      strokeWidth="2.5"
+                      fill="#3b82f6"
+                    />
+                    <path
+                      d="M42 20v9"
+                      stroke="#1e3a8a"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                    />
                     <circle cx="42" cy="31" r="2" fill="#fbbf24" />
                   </svg>
                 }
@@ -258,8 +455,20 @@ export default async function HomePage() {
                 accent={colors.successText}
                 illustration={
                   <svg width="56" height="56" viewBox="0 0 48 48" fill="none">
-                    <path d="M24 4l16 6v14c0 10-7 16-16 20-9-4-16-10-16-20V10l16-6z" fill="#16a34a" stroke="#15803d" strokeWidth="1.5" strokeLinejoin="round" />
-                    <path d="M15 24l6 6 12-12" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
+                    <path
+                      d="M24 4l16 6v14c0 10-7 16-16 20-9-4-16-10-16-20V10l16-6z"
+                      fill="#16a34a"
+                      stroke="#15803d"
+                      strokeWidth="1.5"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M15 24l6 6 12-12"
+                      stroke="#fff"
+                      strokeWidth="3.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
                   </svg>
                 }
               />
@@ -270,8 +479,21 @@ export default async function HomePage() {
                 accent="#be123c"
                 illustration={
                   <svg width="60" height="60" viewBox="0 0 48 48" fill="none">
-                    <path d="M6 6h20l16 16-20 20L6 26V6z" fill="#f472b6" stroke="#db2777" strokeWidth="1.5" strokeLinejoin="round" />
-                    <circle cx="15" cy="15" r="3.5" fill="#fff" stroke="#db2777" strokeWidth="1.5" />
+                    <path
+                      d="M6 6h20l16 16-20 20L6 26V6z"
+                      fill="#f472b6"
+                      stroke="#db2777"
+                      strokeWidth="1.5"
+                      strokeLinejoin="round"
+                    />
+                    <circle
+                      cx="15"
+                      cy="15"
+                      r="3.5"
+                      fill="#fff"
+                      stroke="#db2777"
+                      strokeWidth="1.5"
+                    />
                   </svg>
                 }
               />
@@ -283,33 +505,6 @@ export default async function HomePage() {
       <div style={{ height: layout.gutter }} />
     </>
   );
-}
-
-type DecodedLocation = {
-  city?: string | null;
-  state?: string | null;
-  country?: string | null;
-  country_code?: string | null;
-};
-
-function decodeLocationCookie(raw: string | undefined): DecodedLocation | null {
-  if (!raw) return null;
-  try {
-    const padded = raw + "=".repeat((4 - (raw.length % 4)) % 4);
-    const normalized = padded.replace(/-/g, "+").replace(/_/g, "/");
-    const json = Buffer.from(normalized, "base64").toString("utf-8");
-    return JSON.parse(json) as DecodedLocation;
-  } catch {
-    return null;
-  }
-}
-
-function formatLocationLabel(loc: DecodedLocation | null): string | null {
-  if (!loc) return null;
-  if (loc.city && loc.state) return `${loc.city}, ${loc.state}`;
-  if (loc.city && loc.country_code) return `${loc.city}, ${loc.country_code}`;
-  if (loc.city) return loc.city;
-  return null;
 }
 
 function FeatureCard({
@@ -328,9 +523,34 @@ function FeatureCard({
   cta?: { label: string; href: string };
 }) {
   return (
-    <div style={{ background: bg, borderRadius: radius.lg, padding: 18, position: "relative", overflow: "hidden", minHeight: 130 }}>
-      <h3 style={{ margin: 0, fontSize: font.size.md, fontWeight: font.weight.bold, color: accent }}>{title}</h3>
-      <p style={{ margin: "4px 0 10px", fontSize: font.size.sm, color: colors.textSubtle, maxWidth: "70%" }}>
+    <div
+      style={{
+        background: bg,
+        borderRadius: radius.lg,
+        padding: 18,
+        position: "relative",
+        overflow: "hidden",
+        minHeight: 130,
+      }}
+    >
+      <h3
+        style={{
+          margin: 0,
+          fontSize: font.size.md,
+          fontWeight: font.weight.bold,
+          color: accent,
+        }}
+      >
+        {title}
+      </h3>
+      <p
+        style={{
+          margin: "4px 0 10px",
+          fontSize: font.size.sm,
+          color: colors.textSubtle,
+          maxWidth: "70%",
+        }}
+      >
         {body}
       </p>
       {cta && (
@@ -341,7 +561,7 @@ function FeatureCard({
             background: accent,
             color: "#fff",
             textDecoration: "none",
-            padding: "7px 14px",
+            padding: "10px 16px",
             borderRadius: 6,
             fontSize: font.size.sm,
             fontWeight: font.weight.semibold,
@@ -350,7 +570,9 @@ function FeatureCard({
           {cta.label}
         </Link>
       )}
-      <div style={{ position: "absolute", right: 14, bottom: 14 }}>{illustration}</div>
+      <div style={{ position: "absolute", right: 14, bottom: 14 }}>
+        {illustration}
+      </div>
     </div>
   );
 }

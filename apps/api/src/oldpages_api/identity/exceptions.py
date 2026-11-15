@@ -23,6 +23,18 @@ class InvalidCredentialsError(AppError):
         )
 
 
+class TooManyAttemptsError(AppError):
+    def __init__(
+        self, detail: str = "Too many attempts. Please wait 15 minutes and try again."
+    ) -> None:
+        super().__init__(
+            detail=detail,
+            status_code=429,
+            title="Too Many Attempts",
+            type_uri="https://oldpages.in/problems/too-many-attempts",
+        )
+
+
 class InvalidTokenError(AppError):
     def __init__(self, detail: str = "Invalid or expired token.") -> None:
         super().__init__(

@@ -1,6 +1,8 @@
 .venv
 node_modules
 **/.next
+**/.open-next
+**/.wrangler
 **/coverage
 playwright-report
 test-results

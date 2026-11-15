@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { apiClient } from "../../../lib/api";
+import { decodeLocationCookie, listingPlaceLabel } from "../../../lib/geo";
 import type { ListingSearchResult } from "@oldpages/shared-types";
 import {
   Badge,
@@ -14,7 +16,6 @@ import {
   colors,
   font,
   formatPrice,
-  radius,
   type BookCardData,
 } from "../../../components/ui";
 
@@ -22,7 +23,10 @@ interface BookPageProps {
   params: Promise<{ id: string }>;
 }
 
-function toBookCard(l: ListingSearchResult): BookCardData {
+function toBookCard(
+  l: ListingSearchResult,
+  readerCountry?: string | null,
+): BookCardData {
   return {
     id: l.id,
     href: `/listings/${l.id}`,
@@ -31,7 +35,7 @@ function toBookCard(l: ListingSearchResult): BookCardData {
     imageUrl: l.image_url ?? null,
     priceLabel: formatPrice(l.price_amount_cents, l.currency),
     condition: l.condition ?? null,
-    location: l.location?.city ?? null,
+    location: listingPlaceLabel(l, readerCountry),
   };
 }
 
@@ -45,11 +49,27 @@ export default async function BookPage({ params }: BookPageProps) {
     notFound();
   }
 
+  const activeLocation = decodeLocationCookie(
+    (await cookies()).get("op_loc")?.value,
+  );
   let listings = { items: [] as ListingSearchResult[], result_count: 0 };
   try {
-    const res = await apiClient.searchListings({ q: book.title, limit: 20 });
+    // Every copy, nearest first when the reader has a location (no radius cutoff here).
+    const res = await apiClient.searchListings(
+      activeLocation
+        ? {
+            q: book.title,
+            limit: 20,
+            latitude: activeLocation.latitude,
+            longitude: activeLocation.longitude,
+            sort: "nearest",
+          }
+        : { q: book.title, limit: 20 },
+    );
     listings = { items: res.items, result_count: res.result_count };
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 
   const authorsText = book.authors.map((a) => a.name).join(", ");
 
@@ -57,20 +77,43 @@ export default async function BookPage({ params }: BookPageProps) {
     <div style={{ padding: "20px 0 40px" }}>
       <Container>
         <nav
+          className="op-breadcrumb"
           style={{
-            display: "flex", alignItems: "center", gap: 6,
-            fontSize: font.size.sm, color: colors.textSubtle, marginBottom: 16,
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            fontSize: font.size.sm,
+            color: colors.textSubtle,
+            marginBottom: 16,
           }}
         >
-          <Link href="/" style={{ color: colors.textSubtle, textDecoration: "none" }}>Home</Link>
+          <Link
+            href="/"
+            style={{ color: colors.textSubtle, textDecoration: "none" }}
+          >
+            Home
+          </Link>
           <span>/</span>
-          <Link href="/search" style={{ color: colors.textSubtle, textDecoration: "none" }}>Books</Link>
+          <Link
+            href="/search"
+            style={{ color: colors.textSubtle, textDecoration: "none" }}
+          >
+            Books
+          </Link>
           <span>/</span>
           <span style={{ color: colors.text }}>{book.title}</span>
         </nav>
 
-        <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: 32, alignItems: "flex-start" }}>
-          <div>
+        <div
+          className="op-split"
+          style={
+            {
+              "--op-side": "clamp(200px, 24vw, 260px)",
+              "--op-split-gap": "clamp(20px, 3vw, 32px)",
+            } as React.CSSProperties
+          }
+        >
+          <div className="op-split-media">
             <BookCover
               imageUrl={book.cover_image_url}
               title={book.title}
@@ -94,33 +137,107 @@ export default async function BookPage({ params }: BookPageProps) {
               {book.title}
             </h1>
             {book.subtitle && (
-              <p style={{ margin: "0 0 12px", fontSize: font.size.lg, color: colors.textSubtle }}>{book.subtitle}</p>
+              <p
+                style={{
+                  margin: "0 0 12px",
+                  fontSize: font.size.lg,
+                  color: colors.textSubtle,
+                }}
+              >
+                {book.subtitle}
+              </p>
             )}
             {authorsText && (
-              <p style={{ margin: "0 0 16px", fontSize: font.size.base, color: colors.textMuted }}>
-                by <span style={{ fontWeight: font.weight.semibold }}>{authorsText}</span>
+              <p
+                style={{
+                  margin: "0 0 16px",
+                  fontSize: font.size.base,
+                  color: colors.textMuted,
+                }}
+              >
+                by{" "}
+                <span style={{ fontWeight: font.weight.semibold }}>
+                  {authorsText}
+                </span>
               </p>
             )}
 
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
-              {book.publication_year && <Badge label={String(book.publication_year)} />}
+            <div
+              style={{
+                display: "flex",
+                gap: 6,
+                flexWrap: "wrap",
+                marginBottom: 12,
+              }}
+            >
+              {book.publication_year && (
+                <Badge label={String(book.publication_year)} />
+              )}
               {book.format && book.format !== "unknown" && (
                 <Badge label={book.format.replace("_", " ")} />
               )}
-              {book.language && book.language !== "en" && <Badge label={book.language.toUpperCase()} />}
+              {book.language && book.language !== "en" && (
+                <Badge label={book.language.toUpperCase()} />
+              )}
               {book.page_count && <Badge label={`${book.page_count} pages`} />}
             </div>
 
             {book.genres.length > 0 && (
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16 }}>
-                {book.genres.map((g) => <Badge key={g} variant="info" label={g} />)}
+              <div
+                style={{
+                  display: "flex",
+                  gap: 6,
+                  flexWrap: "wrap",
+                  marginBottom: 16,
+                }}
+              >
+                {book.genres.map((g) => (
+                  <Badge key={g} variant="info" label={g} />
+                ))}
               </div>
             )}
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 20 }}>
-              {book.publisher && <p style={{ margin: 0, fontSize: font.size.sm, color: colors.textFaint }}>Publisher: {book.publisher.name}</p>}
-              {book.isbn_13 && <p style={{ margin: 0, fontSize: font.size.sm, color: colors.textFaint }}>ISBN-13: {book.isbn_13}</p>}
-              {book.isbn_10 && !book.isbn_13 && <p style={{ margin: 0, fontSize: font.size.sm, color: colors.textFaint }}>ISBN-10: {book.isbn_10}</p>}
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 4,
+                marginBottom: 20,
+              }}
+            >
+              {book.publisher && (
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: font.size.sm,
+                    color: colors.textFaint,
+                  }}
+                >
+                  Publisher: {book.publisher.name}
+                </p>
+              )}
+              {book.isbn_13 && (
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: font.size.sm,
+                    color: colors.textFaint,
+                  }}
+                >
+                  ISBN-13: {book.isbn_13}
+                </p>
+              )}
+              {book.isbn_10 && !book.isbn_13 && (
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: font.size.sm,
+                    color: colors.textFaint,
+                  }}
+                >
+                  ISBN-10: {book.isbn_10}
+                </p>
+              )}
             </div>
 
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -137,7 +254,14 @@ export default async function BookPage({ params }: BookPageProps) {
         {book.description && (
           <div style={{ marginTop: 24 }}>
             <Section title="About this book">
-              <p style={{ margin: 0, lineHeight: font.lineHeight.relaxed, color: colors.textMuted, fontSize: font.size.base }}>
+              <p
+                style={{
+                  margin: 0,
+                  lineHeight: font.lineHeight.relaxed,
+                  color: colors.textMuted,
+                  fontSize: font.size.base,
+                }}
+              >
                 {book.description}
               </p>
             </Section>
@@ -147,11 +271,38 @@ export default async function BookPage({ params }: BookPageProps) {
         {book.academic_metadata && (
           <div style={{ marginTop: 16 }}>
             <Section title="Academic info">
-              <dl style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "6px 24px", margin: 0 }}>
-                {book.academic_metadata.subject && (<><dt style={dt}>Subject</dt><dd style={dd}>{book.academic_metadata.subject}</dd></>)}
-                {book.academic_metadata.department && (<><dt style={dt}>Department</dt><dd style={dd}>{book.academic_metadata.department}</dd></>)}
-                {book.academic_metadata.university && (<><dt style={dt}>University</dt><dd style={dd}>{book.academic_metadata.university}</dd></>)}
-                {book.academic_metadata.course && (<><dt style={dt}>Course</dt><dd style={dd}>{book.academic_metadata.course}</dd></>)}
+              <dl
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "auto 1fr",
+                  gap: "6px 24px",
+                  margin: 0,
+                }}
+              >
+                {book.academic_metadata.subject && (
+                  <>
+                    <dt style={dt}>Subject</dt>
+                    <dd style={dd}>{book.academic_metadata.subject}</dd>
+                  </>
+                )}
+                {book.academic_metadata.department && (
+                  <>
+                    <dt style={dt}>Department</dt>
+                    <dd style={dd}>{book.academic_metadata.department}</dd>
+                  </>
+                )}
+                {book.academic_metadata.university && (
+                  <>
+                    <dt style={dt}>University</dt>
+                    <dd style={dd}>{book.academic_metadata.university}</dd>
+                  </>
+                )}
+                {book.academic_metadata.course && (
+                  <>
+                    <dt style={dt}>Course</dt>
+                    <dd style={dd}>{book.academic_metadata.course}</dd>
+                  </>
+                )}
               </dl>
             </Section>
           </div>
@@ -162,8 +313,11 @@ export default async function BookPage({ params }: BookPageProps) {
             title="Available copies"
             actions={
               listings.result_count > 0 ? (
-                <span style={{ color: colors.textSubtle, fontSize: font.size.sm }}>
-                  {listings.result_count} listing{listings.result_count !== 1 ? "s" : ""}
+                <span
+                  style={{ color: colors.textSubtle, fontSize: font.size.sm }}
+                >
+                  {listings.result_count} listing
+                  {listings.result_count !== 1 ? "s" : ""}
                 </span>
               ) : undefined
             }
@@ -173,16 +327,35 @@ export default async function BookPage({ params }: BookPageProps) {
                 icon={<Icon.book size={26} color={colors.primary} />}
                 title="No listings yet"
                 description="Be the first to list a copy of this book."
-                action={<LinkButton href="/listings/create">List Your Copy</LinkButton>}
+                action={
+                  <LinkButton href="/listings/create">
+                    List Your Copy
+                  </LinkButton>
+                }
               />
             ) : (
               <>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 16 }}>
-                  {listings.items.map((l) => <BookCard key={l.id} book={toBookCard(l)} />)}
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns:
+                      "repeat(auto-fill, minmax(min(100%, clamp(120px, 22vw, 200px)), 1fr))",
+                    gap: 16,
+                  }}
+                >
+                  {listings.items.map((l) => (
+                    <BookCard
+                      key={l.id}
+                      book={toBookCard(l, activeLocation?.country_code)}
+                    />
+                  ))}
                 </div>
                 {listings.result_count > listings.items.length && (
                   <div style={{ textAlign: "center", marginTop: 20 }}>
-                    <LinkButton href={`/search?q=${encodeURIComponent(book.title)}`} variant="secondary">
+                    <LinkButton
+                      href={`/search?q=${encodeURIComponent(book.title)}`}
+                      variant="secondary"
+                    >
                       View all {listings.result_count} listings
                     </LinkButton>
                   </div>
@@ -196,5 +369,13 @@ export default async function BookPage({ params }: BookPageProps) {
   );
 }
 
-const dt: React.CSSProperties = { color: colors.textSubtle, fontSize: font.size.sm, fontWeight: font.weight.semibold };
-const dd: React.CSSProperties = { margin: 0, fontSize: font.size.base, color: colors.text };
+const dt: React.CSSProperties = {
+  color: colors.textSubtle,
+  fontSize: font.size.sm,
+  fontWeight: font.weight.semibold,
+};
+const dd: React.CSSProperties = {
+  margin: 0,
+  fontSize: font.size.base,
+  color: colors.text,
+};

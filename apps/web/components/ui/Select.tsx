@@ -29,11 +29,22 @@ export function Select({
   const borderColor = error ? colors.danger : colors.borderStrong;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6, ...containerStyle }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 6,
+        ...containerStyle,
+      }}
+    >
       {label && (
         <label
           htmlFor={selectId}
-          style={{ fontSize: font.size.sm, fontWeight: font.weight.semibold, color: colors.textMuted }}
+          style={{
+            fontSize: font.size.sm,
+            fontWeight: font.weight.semibold,
+            color: colors.textMuted,
+          }}
         >
           {label}
         </label>
@@ -63,9 +74,13 @@ export function Select({
         ))}
       </select>
       {error ? (
-        <span style={{ fontSize: font.size.sm, color: colors.danger }}>{error}</span>
+        <span style={{ fontSize: font.size.sm, color: colors.danger }}>
+          {error}
+        </span>
       ) : helperText ? (
-        <span style={{ fontSize: font.size.sm, color: colors.textSubtle }}>{helperText}</span>
+        <span style={{ fontSize: font.size.sm, color: colors.textSubtle }}>
+          {helperText}
+        </span>
       ) : null}
     </div>
   );

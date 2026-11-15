@@ -43,8 +43,13 @@ const routes = [
 test.describe("admin routes", () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
-      const payload = window.btoa(JSON.stringify({ email: "admin@example.com" }));
-      window.localStorage.setItem("op_access_token", `header.${payload}.signature`);
+      const payload = window.btoa(
+        JSON.stringify({ email: "admin@example.com" }),
+      );
+      window.localStorage.setItem(
+        "op_access_token",
+        `header.${payload}.signature`,
+      );
     });
   });
 
@@ -60,7 +65,9 @@ test.describe("admin routes", () => {
         const pathname = requestUrl.pathname;
 
         if (pathname === "/api/v1/admin/moderation/cases") {
-          await route.fulfill({ json: { items: [moderationCase], next_cursor: null } });
+          await route.fulfill({
+            json: { items: [moderationCase], next_cursor: null },
+          });
           return;
         }
 
@@ -81,13 +88,26 @@ test.describe("admin routes", () => {
           return;
         }
 
+        if (pathname === "/api/v1/institutions/pending") {
+          await route.fulfill({ json: { items: [], next_cursor: null } });
+          return;
+        }
+
+        if (pathname === "/api/v1/business/pending") {
+          await route.fulfill({ json: [] });
+          return;
+        }
+
         if (pathname === "/api/v1/orders") {
           await route.fulfill({ json: { items: [], next_cursor: null } });
           return;
         }
 
         unexpectedApiCalls.push(pathname);
-        await route.fulfill({ json: { detail: "Unexpected API call in route crawl" }, status: 404 });
+        await route.fulfill({
+          json: { detail: "Unexpected API call in route crawl" },
+          status: 404,
+        });
       });
 
       await page.goto(path);

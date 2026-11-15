@@ -16,11 +16,12 @@ export function PageHeader({ title, subtitle, eyebrow, icon, actions }: Props) {
         display: "flex",
         alignItems: "flex-start",
         justifyContent: "space-between",
-        gap: 16,
+        flexWrap: "wrap",
+        gap: 12,
         marginBottom: 20,
       }}
     >
-      <div style={{ minWidth: 0, flex: 1 }}>
+      <div style={{ minWidth: 0, flex: "1 1 240px" }}>
         {eyebrow && (
           <div
             style={{
@@ -63,7 +64,18 @@ export function PageHeader({ title, subtitle, eyebrow, icon, actions }: Props) {
           </p>
         )}
       </div>
-      {actions && <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>{actions}</div>}
+      {actions && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            flexShrink: 0,
+          }}
+        >
+          {actions}
+        </div>
+      )}
     </header>
   );
 }

@@ -17,7 +17,11 @@ const NAV_LINKS = [
   { href: "/analytics", label: "Analytics" },
 ];
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const [userEmail, setUserEmail] = useState<string>("");
@@ -49,9 +53,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <span className="admin-brand">OldPages Admin</span>
         <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
           {userEmail && (
-            <span style={{ fontSize: ".875rem", color: "#5c6670" }}>{userEmail}</span>
+            <span style={{ fontSize: ".875rem", color: "#5c6670" }}>
+              {userEmail}
+            </span>
           )}
-          <button className="admin-btn admin-btn-secondary admin-btn-sm" onClick={handleLogout}>
+          <button
+            className="admin-btn admin-btn-secondary admin-btn-sm"
+            onClick={handleLogout}
+          >
             Logout
           </button>
         </div>

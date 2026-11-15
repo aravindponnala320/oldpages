@@ -5,7 +5,11 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Spinner } from "../../components/ui/Spinner";
 
-export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
+export default function ProtectedLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
 
@@ -15,7 +19,10 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center" style={{ minHeight: "100vh" }}>
+      <div
+        className="flex items-center justify-center"
+        style={{ minHeight: "100vh" }}
+      >
         <Spinner size="lg" />
       </div>
     );

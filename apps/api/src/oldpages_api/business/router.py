@@ -19,7 +19,11 @@ from oldpages_api.business.schemas import (
     StaffInviteRequest,
 )
 from oldpages_api.business.service import BusinessService
-from oldpages_api.identity.dependencies import CurrentPrincipal, get_current_principal, get_moderator_principal
+from oldpages_api.identity.dependencies import (
+    CurrentPrincipal,
+    get_current_principal,
+    get_moderator_principal,
+)
 from oldpages_api.shared.db.database import get_session
 
 business_router = APIRouter(prefix="/business", tags=["business"])

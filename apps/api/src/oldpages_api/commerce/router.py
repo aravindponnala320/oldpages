@@ -20,7 +20,6 @@ from oldpages_api.commerce.schemas import (
     TransactionResponse,
 )
 from oldpages_api.commerce.service import CommerceService
-from oldpages_api.commerce.service import CommerceService
 from oldpages_api.identity.dependencies import (
     CurrentPrincipal,
     get_current_principal,
@@ -49,7 +48,9 @@ async def list_offers(
     listing_id: str | None = Query(default=None, max_length=26),
     limit: int = Query(default=50, ge=1, le=100),
 ) -> list[OfferResponse]:
-    return await commerce_service(session).list_offers(principal.user, role=role, listing_id=listing_id, limit=limit)
+    return await commerce_service(session).list_offers(
+        principal.user, role=role, listing_id=listing_id, limit=limit
+    )
 
 
 @offers_router.get("/{offer_id}", response_model=OfferResponse)
@@ -213,7 +214,10 @@ async def cancel_transaction(
     session: SessionDep,
 ) -> TransactionResponse:
     return await commerce_service(session).cancel_transaction(
-        transaction_id, payload.reason, principal.user, request_context(request),
+        transaction_id,
+        payload.reason,
+        principal.user,
+        request_context(request),
     )
 
 
@@ -225,7 +229,9 @@ async def mark_transaction_received(
     session: SessionDep,
 ) -> TransactionResponse:
     return await commerce_service(session).mark_transaction_received(
-        transaction_id, principal.user, request_context(request),
+        transaction_id,
+        principal.user,
+        request_context(request),
     )
 
 
@@ -237,7 +243,9 @@ async def mark_transaction_delivered(
     session: SessionDep,
 ) -> TransactionResponse:
     return await commerce_service(session).mark_transaction_delivered(
-        transaction_id, principal.user, request_context(request),
+        transaction_id,
+        principal.user,
+        request_context(request),
     )
 
 

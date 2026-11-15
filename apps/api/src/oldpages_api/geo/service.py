@@ -7,11 +7,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from oldpages_api.core.config import Settings
 from oldpages_api.geo import ip as ip_lookup
-from oldpages_api.geo import nominatim
+from oldpages_api.geo import nominatim, places
 from oldpages_api.geo import pincode as pincode_lookup
 from oldpages_api.geo.schemas import (
     ActiveLocationResponse,
     DetectLocationResponse,
+    GeoSearchItem,
     GeoSearchResponse,
     LocationPayload,
     LocationSource,
@@ -19,6 +20,27 @@ from oldpages_api.geo.schemas import (
 from oldpages_api.identity.models import User, UserPreference
 
 HOME_KEY = "home_location"
+
+
+def _place_item(place: places.Place) -> GeoSearchItem:
+    return GeoSearchItem(
+        display_name=nominatim.label(place.name, place.state, "India"),
+        latitude=place.latitude,
+        longitude=place.longitude,
+        city=place.name,
+        state=place.state,
+        country="India",
+        country_code="IN",
+        type="city",
+    )
+
+
+def _item_key(item: GeoSearchItem) -> tuple[str, str, str]:
+    return (
+        places.normalise(item.locality or ""),
+        places.normalise(item.city or ""),
+        places.normalise(item.state or ""),
+    )
 
 
 class GeoService:
@@ -41,24 +63,37 @@ class GeoService:
         return DetectLocationResponse(location=loc, source="ip")
 
     async def search(self, query: str, limit: int, country_codes: str | None) -> GeoSearchResponse:
-        items = await nominatim.search(
-            query,
-            self.settings,
-            self.redis,
-            self.http_client,
-            limit=limit,
-            country_codes=country_codes,
-        )
-        return GeoSearchResponse(items=items)
+        """Indian towns from the offline index first, then OSM for localities and abroad."""
+        wants_india = not country_codes or "in" in country_codes.lower().split(",")
+        local = places.search(query, limit) if wants_india else []
+        items = [_place_item(p) for p in local]
+        # An exact city name ("Hyderabad", "Bangalore") needs no upstream call.
+        # Otherwise OSM fills in neighbourhoods ("Gachibowli") and places abroad
+        # ("London"), with Indian results kept first.
+        exact = any(places.normalise(query) in p.keys for p in local)
+        if not exact:
+            remote = await nominatim.search(
+                query,
+                self.settings,
+                self.redis,
+                self.http_client,
+                limit=limit,
+                country_codes=country_codes,
+            )
+            remote.sort(key=lambda item: item.country_code != "IN")  # stable: India first
+            seen = {_item_key(i) for i in items}
+            for item in remote:
+                if _item_key(item) not in seen:
+                    seen.add(_item_key(item))
+                    items.append(item)
+        return GeoSearchResponse(items=items[:limit])
 
     async def reverse(self, latitude: float, longitude: float) -> LocationPayload | None:
         return await nominatim.reverse(
             latitude, longitude, self.settings, self.redis, self.http_client
         )
 
-    async def lookup_pincode(
-        self, pincode: str, country_code: str
-    ) -> LocationPayload | None:
+    async def lookup_pincode(self, pincode: str, country_code: str) -> LocationPayload | None:
         return await pincode_lookup.lookup(
             pincode, country_code, self.settings, self.redis, self.http_client
         )

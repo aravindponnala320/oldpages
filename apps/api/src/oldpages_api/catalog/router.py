@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from oldpages_api.catalog.schemas import (
@@ -11,6 +11,7 @@ from oldpages_api.catalog.schemas import (
     BookListResponse,
     BookResponse,
     BookUpdateRequest,
+    CategoryLevelsResponse,
     CategoryTreeResponse,
     PublisherListResponse,
     ResolveIsbnRequest,
@@ -108,9 +109,30 @@ async def update_book(
     )
 
 
+# The tree only changes through migrations, so browsers and CDNs may keep it a while.
+CATEGORY_CACHE = "public, max-age=3600, stale-while-revalidate=86400"
+
+
 @categories_router.get("", response_model=CategoryTreeResponse)
-async def list_categories(session: SessionDep) -> CategoryTreeResponse:
-    return await catalog_service(session).list_categories()
+async def list_categories(
+    session: SessionDep,
+    response: Response,
+    # The whole tree is ~1,400 nodes (264 KB); ask for deeper levels explicitly.
+    max_depth: int = Query(default=2, ge=1, le=10),
+) -> CategoryTreeResponse:
+    response.headers["Cache-Control"] = CATEGORY_CACHE
+    return await catalog_service(session).list_categories(max_depth)
+
+
+@categories_router.get("/levels", response_model=CategoryLevelsResponse)
+async def category_levels(
+    session: SessionDep,
+    response: Response,
+    slug: str | None = Query(default=None, max_length=180),
+) -> CategoryLevelsResponse:
+    """The cascading dropdowns for `slug`: its ancestors' sibling lists plus its children."""
+    response.headers["Cache-Control"] = CATEGORY_CACHE
+    return await catalog_service(session).category_levels(slug)
 
 
 @authors_router.get("", response_model=AuthorListResponse)

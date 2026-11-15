@@ -4,21 +4,23 @@ from typing import Any, cast
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from conftest import RegisterUser
+from oldpages_api.listings.models import ListingLocation
 
-PRICE_MODES = {"sell", "sell_exchange", "rent", "bulk_sale"}
+PRICE_MODES = {"sell", "rent"}
+DISABLED_MODES = {"lend", "rent", "request"}  # Settings.disabled_listing_modes default
 ALL_MODES = [
     "sell",
     "exchange",
-    "sell_exchange",
     "donate",
     "lend",
     "rent",
     "request",
-    "giveaway",
-    "bulk_sale",
 ]
+RETIRED_MODES = ["sell_exchange", "giveaway", "bulk_sale"]
 
 
 @pytest.mark.asyncio
@@ -168,6 +170,26 @@ async def test_delete_soft_deletes_and_public_get_returns_not_found(
     assert public_response.status_code == 404
 
 
+@pytest.mark.parametrize("mode", RETIRED_MODES)
+@pytest.mark.asyncio
+async def test_retired_listing_types_are_refused(
+    mode: str,
+    client: AsyncClient,
+    register_user: RegisterUser,
+) -> None:
+    token = (await register_user(client))["tokens"]["access_token"]
+    book = await create_book(client, token, title=f"Mode {mode}")
+    media = await upload_media(client, token)
+
+    response = await client.post(
+        "/api/v1/listings",
+        headers=auth(token),
+        json=listing_payload(book_id=book["id"], image_id=media["id"], listing_modes=[mode]),
+    )
+
+    assert response.status_code == 422, response.text
+
+
 @pytest.mark.parametrize("mode", ALL_MODES)
 @pytest.mark.asyncio
 async def test_create_draft_listing_for_every_listing_type(
@@ -195,8 +217,72 @@ async def test_create_draft_listing_for_every_listing_type(
         ),
     )
 
+    if mode in DISABLED_MODES:
+        assert create_response.status_code == 422, create_response.text
+        assert "not available yet" in create_response.json()["detail"]
+        return
     assert create_response.status_code == 201, create_response.text
     assert create_response.json()["listing_modes"] == [mode]
+
+
+@pytest.mark.asyncio
+async def test_listing_currency_follows_its_country(
+    client: AsyncClient,
+    register_user: RegisterUser,
+) -> None:
+    registered = await register_user(client)
+    token = registered["tokens"]["access_token"]
+    book = await create_book(client, token, title="Currency Book")
+    media = await upload_media(client, token)
+    payload = listing_payload(book_id=book["id"], image_id=media["id"])
+    payload["location"].update(
+        city="London", country="GB", exact_latitude="51.50", exact_longitude="-0.12"
+    )
+
+    created = await client.post("/api/v1/listings", headers=auth(token), json=payload)
+    assert created.status_code == 201, created.text
+    assert created.json()["currency"] == "GBP"
+
+    # Moving the book to India re-prices it in rupees; a stale "currency" can't override.
+    location = {**payload["location"], "city": "Pune", "country": "IN"}
+    updated = await client.patch(
+        f"/api/v1/listings/{created.json()['id']}",
+        headers=auth(token),
+        json={"location": location, "currency": "GBP"},
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["currency"] == "INR"
+
+
+@pytest.mark.asyncio
+async def test_listing_without_coordinates_gets_its_city_location(
+    client: AsyncClient,
+    register_user: RegisterUser,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    registered = await register_user(client)
+    token = registered["tokens"]["access_token"]
+    book = await create_book(client, token, title="City Fallback")
+    media = await upload_media(client, token)
+    payload = listing_payload(book_id=book["id"], image_id=media["id"])
+    payload["location"] = {
+        "city": "bangalore",
+        "country": "IN",
+        "public_area": "Koramangala",
+        "state": "karnataka",
+    }
+
+    response = await client.post("/api/v1/listings", headers=auth(token), json=payload)
+
+    assert response.status_code == 201, response.text
+    location = response.json()["location"]
+    assert location["city"] == "Bengaluru"
+    assert location["state"] == "Karnataka"
+    async with session_factory() as session:
+        stored = (await session.execute(select(ListingLocation))).scalar_one()
+    # Without coordinates the "near me" radius filter could never find this listing.
+    assert stored.public_latitude == pytest.approx(12.97)
+    assert stored.public_longitude == pytest.approx(77.59)
 
 
 async def create_book(
@@ -303,3 +389,22 @@ def listing_payload(
 
 def auth(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.mark.asyncio
+async def test_listing_a_new_title_creates_its_author_once(
+    client: AsyncClient,
+    register_user: RegisterUser,
+) -> None:
+    token = (await register_user(client))["tokens"]["access_token"]
+    ids = []
+    for spelling in ["R. K. Narayan", "  r. k.  NARAYAN "]:
+        media = await upload_media(client, token)
+        payload = listing_payload(image_id=media["id"])
+        payload["book_title"] = "Swami and Friends"
+        payload["book_author"] = spelling
+        response = await client.post("/api/v1/listings", headers=auth(token), json=payload)
+        assert response.status_code == 201, response.text
+        ids.append(response.json()["book"]["id"])
+
+    assert ids[0] == ids[1]  # same edition, same author row

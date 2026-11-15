@@ -1,10 +1,16 @@
 from __future__ import annotations
 
-from sqlalchemy import select
+from datetime import datetime
+from typing import Any, cast
+
+from sqlalchemy import CursorResult, exists, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.base import ExecutableOption
 
+from oldpages_api.commerce.models import PickupSession, Transaction
+from oldpages_api.identity.models import UserPreference
+from oldpages_api.listings.models import Listing, ListingInventory
 from oldpages_api.payments.models import (
     Cart,
     CartItem,
@@ -90,7 +96,7 @@ class PaymentsRepository:
         result = await self.session.execute(
             select(Payment)
             .execution_options(populate_existing=True)
-            .options(selectinload(Payment.order))
+            .options(selectinload(Payment.order), selectinload(Payment.refunds))
             .where(Payment.public_id == public_id)
         )
         return result.unique().scalar_one_or_none()
@@ -116,7 +122,7 @@ class PaymentsRepository:
         result = await self.session.execute(
             select(Payment)
             .execution_options(populate_existing=True)
-            .options(selectinload(Payment.order))
+            .options(selectinload(Payment.order), selectinload(Payment.refunds))
             .where(
                 Payment.provider == provider,
                 Payment.provider_payment_id == provider_payment_id,
@@ -201,7 +207,172 @@ class PaymentsRepository:
         result = await self.session.execute(select(IdempotencyKey).where(IdempotencyKey.key == key))
         return result.scalar_one_or_none()
 
+    async def get_order_for_cart(self, cart_id: int) -> Order | None:
+        result = await self.session.execute(
+            select(Order).options(*order_load_options()).where(Order.cart_id == cart_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_order_for_offer(self, offer_id: int) -> Order | None:
+        result = await self.session.execute(
+            select(Order).options(*order_load_options()).where(Order.offer_id == offer_id)
+        )
+        return result.scalar_one_or_none()
+
+    # --- Stock ---
+
+    async def claim_active_cart(self, cart_id: int) -> bool:
+        """Moves the cart out of 'active' once, so two checkouts can't both proceed."""
+        result = await self.session.execute(
+            update(Cart)
+            .where(Cart.id == cart_id, Cart.status == "active")
+            .values(status="checked_out")
+            .execution_options(synchronize_session=False)
+        )
+        return cast("CursorResult[Any]", result).rowcount == 1
+
+    async def get_listings_for_checkout(self, listing_ids: list[int]) -> dict[int, Listing]:
+        result = await self.session.execute(
+            select(Listing)
+            .options(
+                selectinload(Listing.condition),
+                selectinload(Listing.delivery_methods),
+                selectinload(Listing.inventory),
+            )
+            .where(Listing.id.in_(listing_ids))
+        )
+        return {listing.id: listing for listing in result.scalars().all()}
+
+    async def reserve_inventory(self, listing_id: int, quantity: int) -> bool:
+        result = await self.session.execute(
+            update(ListingInventory)
+            .where(
+                ListingInventory.listing_id == listing_id,
+                ListingInventory.quantity_available >= quantity,
+            )
+            .values(quantity_available=ListingInventory.quantity_available - quantity)
+            .execution_options(synchronize_session=False)
+        )
+        return cast("CursorResult[Any]", result).rowcount == 1
+
+    async def release_inventory(self, listing_id: int, quantity: int) -> None:
+        await self.session.execute(
+            update(ListingInventory)
+            .where(
+                ListingInventory.listing_id == listing_id,
+                ListingInventory.quantity_available + quantity <= ListingInventory.quantity_total,
+            )
+            .values(quantity_available=ListingInventory.quantity_available + quantity)
+            .execution_options(synchronize_session=False)
+        )
+        await self.session.execute(
+            update(Listing)
+            .where(Listing.id == listing_id, Listing.status == "reserved")
+            .values(status="active")
+            .execution_options(synchronize_session=False)
+        )
+
+    async def get_open_transaction_for_offer(self, offer_id: int) -> Transaction | None:
+        result = await self.session.execute(
+            select(Transaction).where(
+                Transaction.offer_id == offer_id,
+                Transaction.status.in_(("reserved", "ready_for_pickup")),
+            )
+        )
+        return result.scalar_one_or_none()
+
+    # --- Background jobs ---
+
+    async def unpaid_orders_before(self, cutoff: datetime, limit: int) -> list[Order]:
+        result = await self.session.execute(
+            select(Order)
+            .options(*order_load_options())
+            .where(Order.status == "awaiting_payment", Order.created_at < cutoff)
+            .order_by(Order.id)
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
+    async def delivered_orders_before(self, cutoff: datetime, limit: int) -> list[Order]:
+        delivered_long_ago = exists().where(
+            Shipment.order_id == Order.id,
+            Shipment.status == "delivered",
+            Shipment.delivered_at < cutoff,
+        )
+        open_dispute = exists().where(
+            Dispute.order_id == Order.id, Dispute.status.in_(("opened", "under_review"))
+        )
+        result = await self.session.execute(
+            select(Order)
+            .options(*order_load_options())
+            .where(Order.status == "delivered", delivered_long_ago, ~open_dispute)
+            .order_by(Order.id)
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
+    async def stale_offer_holds(self, cutoff: datetime, limit: int) -> list[Transaction]:
+        """Accepted offers still holding a copy with no pickup planned and no order paid."""
+        planned_pickup = exists().where(
+            PickupSession.transaction_id == Transaction.id,
+            PickupSession.status.in_(("proposed", "confirmed")),
+        )
+        paying_order = exists().where(
+            Order.offer_id == Transaction.offer_id,
+            Order.status.notin_(("created", "awaiting_payment", "cancelled")),
+        )
+        result = await self.session.execute(
+            select(Transaction)
+            .where(
+                Transaction.status == "reserved",
+                Transaction.accepted_at < cutoff,
+                ~planned_pickup,
+                ~paying_order,
+            )
+            .order_by(Transaction.id)
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
+    async def complete_listing_if_sold_out(self, listing_id: int) -> None:
+        sold_out = exists().where(
+            ListingInventory.listing_id == listing_id, ListingInventory.quantity_available == 0
+        )
+        await self.session.execute(
+            update(Listing)
+            .where(Listing.id == listing_id, Listing.status == "reserved", sold_out)
+            .values(status="completed")
+            .execution_options(synchronize_session=False)
+        )
+
+    async def cancel_unpaid_offer_orders(self, offer_id: int) -> None:
+        await self.session.execute(
+            update(Order)
+            .where(Order.offer_id == offer_id, Order.status.in_(("created", "awaiting_payment")))
+            .values(status="cancelled")
+            .execution_options(synchronize_session=False)
+        )
+
+    async def move_order_status(self, order_id: int, from_status: str, to_status: str) -> bool:
+        """Changes status only if nothing else changed it first (e.g. a payment landing)."""
+        result = await self.session.execute(
+            update(Order)
+            .where(Order.id == order_id, Order.status == from_status)
+            .values(status=to_status)
+            .execution_options(synchronize_session=False)
+        )
+        return cast("CursorResult[Any]", result).rowcount == 1
+
     # --- Session helpers ---
+
+    async def user_has_any_role(self, user_id: int, roles: tuple[str, ...]) -> bool:
+        # Roles live in user preferences (see trust.repository.user_has_role).
+        result = await self.session.execute(
+            select(UserPreference.metadata_json).where(UserPreference.user_id == user_id)
+        )
+        metadata: dict[str, Any] = result.scalar_one_or_none() or {}
+        granted = metadata.get("roles", [])
+        return isinstance(granted, list) and any(role in granted for role in roles)
 
     def add(self, instance: object) -> None:
         self.session.add(instance)
@@ -211,6 +382,9 @@ class PaymentsRepository:
 
     async def flush(self) -> None:
         await self.session.flush()
+
+    async def rollback(self) -> None:
+        await self.session.rollback()
 
     async def commit(self) -> None:
         await self.session.commit()
@@ -229,7 +403,8 @@ def order_load_options() -> tuple[ExecutableOption, ...]:
         selectinload(Order.buyer),
         selectinload(Order.cart),
         selectinload(Order.disputes).selectinload(Dispute.opened_by),
-        selectinload(Order.disputes).selectinload(Dispute.order),
+        # Not .selectinload(Dispute.order): that is this order, and with populate_existing it
+        # would be reloaded without these options, leaving cart unloaded (a 500 on async).
         selectinload(Order.disputes).selectinload(Dispute.resolved_by),
         selectinload(Order.items),
         selectinload(Order.payments).selectinload(Payment.refunds),

@@ -11,12 +11,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from oldpages_api.core.config import Settings
 from oldpages_api.email import EmailClient, build_email_client
+from oldpages_api.identity import rate_limit
 from oldpages_api.identity.exceptions import (
     DuplicateAccountError,
     ForbiddenIdentityActionError,
     InvalidCredentialsError,
     InvalidTokenError,
     RefreshTokenReuseError,
+    TooManyAttemptsError,
     UserNotFoundError,
 )
 from oldpages_api.identity.models import (
@@ -60,6 +62,9 @@ from oldpages_api.identity.security import (
 )
 from oldpages_api.shared.db.ids import new_ulid
 
+TERMS_VERSION = "2026-06-23"
+PRIVACY_VERSION = "2026-06-23"
+
 
 @dataclass(slots=True)
 class SessionIssueResult:
@@ -84,6 +89,17 @@ class IdentityService:
         payload: RegisterRequest,
         context: AuthenticatedRequestContext,
     ) -> AuthResponse:
+        if (
+            self.settings.auth_rate_limit_enabled
+            and context.ip_address
+            and rate_limit.is_public_ip(context.ip_address)
+            and not await rate_limit.allow(
+                rate_limit.limit_key("register-ip", context.ip_address),
+                self.settings.registrations_per_ip,
+                60 * 60,
+            )
+        ):
+            raise TooManyAttemptsError("Too many sign-ups from this network. Try again later.")
         existing = await self.repo.get_user_by_email(payload.email)
         if existing is not None:
             raise DuplicateAccountError()
@@ -108,8 +124,8 @@ class IdentityService:
         preferences = UserPreference(user_id=user.id)
         consent = ConsentRecord(
             user_id=user.id,
-            terms_version="2026-06-23",
-            privacy_version="2026-06-23",
+            terms_version=TERMS_VERSION,
+            privacy_version=PRIVACY_VERSION,
             accepted_at=now,
             ip_address=context.ip_address,
             user_agent=context.user_agent,
@@ -174,8 +190,8 @@ class IdentityService:
         preferences = UserPreference(user_id=user.id)
         consent = ConsentRecord(
             user_id=user.id,
-            terms_version="2026-06-23",
-            privacy_version="2026-06-23",
+            terms_version=TERMS_VERSION,
+            privacy_version=PRIVACY_VERSION,
             accepted_at=now,
             ip_address=context.ip_address,
             user_agent=context.user_agent,
@@ -213,12 +229,19 @@ class IdentityService:
     async def login(
         self, payload: LoginRequest, context: AuthenticatedRequestContext
     ) -> AuthResponse:
+        guarded = self._login_limit_keys(payload.email, context.ip_address)
+        for key, limit in guarded:
+            if await rate_limit.count(key) >= limit:
+                raise TooManyAttemptsError()
         user = await self.repo.get_user_by_email(payload.email)
         if (
             user is None
             or user.status != "active"
             or not verify_password(payload.password, user.password_hash)
         ):
+            # Only failures count, so someone signing in normally is never locked out.
+            for key, limit in guarded:
+                await rate_limit.allow(key, limit, 15 * 60)
             raise InvalidCredentialsError()
 
         issue = await self._issue_session(
@@ -335,9 +358,17 @@ class IdentityService:
         email: str,
         context: AuthenticatedRequestContext,
     ) -> RequestAcceptedResponse:
-        user = await self.repo.get_user_by_email(normalize_email(email))
+        email = normalize_email(email)
+        user = await self.repo.get_user_by_email(email)
         token: str | None = None
-        if user is not None and user.status == "active":
+        # Counted for every request, so the answer looks the same whether or not the account exists.
+        allowed = await self._reset_request_allowed(email, context.ip_address)
+        if user is not None and user.status == "active" and allowed:
+            # Works for every account: password, Google-only (this sets a first password) or
+            # unverified. A newer link replaces any older one still waiting in the inbox.
+            await self.repo.expire_verifications(
+                user_id=user.id, verification_type="password_reset", now=utc_now()
+            )
             token = await self._create_verification(
                 user=user,
                 verification_type="password_reset",
@@ -353,8 +384,11 @@ class IdentityService:
             )
             await self.repo.commit()
             await self._send_password_reset_email(user.email, token)
+        dev_token = self._development_token(token)
+        # Outside development the answer must not hint whether the account exists.
         return RequestAcceptedResponse(
-            accepted=True, development_token=self._development_token(token)
+            accepted=True,
+            development_token=dev_token if dev_token and dev_token.token else None,
         )
 
     async def reset_password(
@@ -368,8 +402,15 @@ class IdentityService:
         user = await self.repo.get_user_by_id(verification.user_id)
         if user is None or user.status != "active":
             raise InvalidTokenError()
+        now = utc_now()
         user.password_hash = hash_password(new_password)
-        await self.repo.revoke_sessions(user_id=user.id, now=utc_now(), reason="password_reset")
+        # Opening the emailed link proves the address belongs to them.
+        if user.email_verified_at is None:
+            user.email_verified_at = now
+        await self.repo.expire_verifications(
+            user_id=user.id, verification_type="password_reset", now=now
+        )
+        await self.repo.revoke_sessions(user_id=user.id, now=now, reason="password_reset")
         await self._audit(
             action="PASSWORD_RESET_COMPLETED",
             actor_user_id=user.id,
@@ -401,23 +442,48 @@ class IdentityService:
         else:
             existing_user = await self.repo.get_user_by_email(oauth_identity.email)
             if existing_user is not None:
-                raise ForbiddenIdentityActionError(
-                    "Existing accounts must link OAuth providers from an authenticated session."
+                # The provider has verified this email, so link it to the existing account.
+                if existing_user.status != "active":
+                    raise InvalidCredentialsError()
+                if await self.repo.has_social_account(existing_user.id, oauth_identity.provider):
+                    raise ForbiddenIdentityActionError(
+                        f"This account is already linked to a different {provider} account."
+                    )
+                user = existing_user
+                if user.email_verified_at is None:
+                    # Nobody ever proved ownership of this address, so whoever set the
+                    # password may not be its owner: drop their password and sessions.
+                    user.email_verified_at = now
+                    user.password_hash = None
+                    await self.repo.revoke_sessions(
+                        user_id=user.id, now=now, reason="oauth_link_unverified_email"
+                    )
+            else:
+                user = User(
+                    email=oauth_identity.email,
+                    email_verified_at=now,
+                    status="active",
                 )
-            user = User(
-                email=oauth_identity.email,
-                email_verified_at=now,
-                status="active",
-            )
-            self.repo.add(user)
-            await self.repo.flush()
-            self.repo.add(
-                UserProfile(
-                    user_id=user.id,
-                    display_name=oauth_identity.email.split("@", maxsplit=1)[0],
+                self.repo.add(user)
+                await self.repo.flush()
+                self.repo.add(
+                    UserProfile(
+                        user_id=user.id,
+                        display_name=oauth_identity.email.split("@", maxsplit=1)[0],
+                    )
                 )
-            )
-            self.repo.add(UserPreference(user_id=user.id))
+                self.repo.add(UserPreference(user_id=user.id))
+                # The sign-in screens tell users that continuing accepts these policies.
+                self.repo.add(
+                    ConsentRecord(
+                        user_id=user.id,
+                        terms_version=TERMS_VERSION,
+                        privacy_version=PRIVACY_VERSION,
+                        accepted_at=now,
+                        ip_address=context.ip_address,
+                        user_agent=context.user_agent,
+                    )
+                )
             self.repo.add(
                 SocialAccount(
                     user_id=user.id,
@@ -830,6 +896,41 @@ class IdentityService:
                 status=user.status,
             ),
         )
+
+    def _login_limit_keys(self, email: str, ip_address: str | None) -> list[tuple[str, int]]:
+        if not self.settings.auth_rate_limit_enabled:
+            return []
+        keys = [
+            (
+                rate_limit.limit_key("login-email", normalize_email(email)),
+                self.settings.login_failures_per_email,
+            )
+        ]
+        if ip_address and rate_limit.is_public_ip(ip_address):
+            keys.append(
+                (rate_limit.limit_key("login-ip", ip_address), self.settings.login_failures_per_ip)
+            )
+        return keys
+
+    async def _reset_request_allowed(self, email: str, ip_address: str | None) -> bool:
+        if not self.settings.auth_rate_limit_enabled:
+            return True
+        window = 15 * 60
+        email_ok = await rate_limit.allow(
+            rate_limit.limit_key("pwreset-email", email),
+            self.settings.password_reset_per_email,
+            window,
+        )
+        ip_ok = (
+            await rate_limit.allow(
+                rate_limit.limit_key("pwreset-ip", ip_address or ""),
+                self.settings.password_reset_per_ip,
+                window,
+            )
+            if rate_limit.is_public_ip(ip_address)
+            else True
+        )
+        return email_ok and ip_ok
 
     def _development_token(self, token: str | None) -> DevelopmentToken | None:
         if token is None:

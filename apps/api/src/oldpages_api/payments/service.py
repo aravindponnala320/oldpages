@@ -1,15 +1,20 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import Any, cast
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from oldpages_api.commerce.models import Offer
+from oldpages_api.core.config import get_settings
 from oldpages_api.identity.models import AuditLog, User
 from oldpages_api.identity.schemas import AuthenticatedRequestContext
 from oldpages_api.identity.security import utc_now
 from oldpages_api.listings.models import Listing
+from oldpages_api.listings.service import ListingService
+from oldpages_api.listings.tasks import refresh_listing_search_document
 from oldpages_api.payments.events import (
     DISPUTE_OPENED,
     DISPUTE_RESOLVED,
@@ -94,13 +99,45 @@ from oldpages_api.payments.schemas import (
 
 logger = logging.getLogger(__name__)
 
-PAYMENT_PROVIDERS: dict[str, PaymentProvider] = {
-    "local": LocalPaymentProvider(),
+MODERATOR_ROLES = ("admin", "moderator", "trust_moderator")
+
+# Where a webhook may move a payment. Anything else is a late or replayed event.
+PAYMENT_TRANSITIONS: dict[str, set[str]] = {
+    "pending": {"authorized", "captured", "failed"},
+    "authorized": {"captured", "failed"},
+    "failed": {"authorized", "captured"},  # the buyer retried and it went through
+    "captured": {"refunded"},
+    "disputed": {"refunded"},
+    "refunded": set(),
 }
 
-SHIPPING_PROVIDERS: dict[str, ShippingProvider] = {
-    "local": LocalShippingProvider(),
+_SHIPMENT_STEPS = ("pending", "label_generated", "picked_up", "in_transit", "delivered")
+# Forward along the delivery steps, or off to failed/returned; never backwards.
+SHIPMENT_TRANSITIONS: dict[str, set[str]] = {
+    step: {*_SHIPMENT_STEPS[i + 1 :], "failed", "returned"}
+    - ({"failed"} if step == "delivered" else set())
+    for i, step in enumerate(_SHIPMENT_STEPS)
 }
+SHIPMENT_TRANSITIONS["failed"] = {"picked_up", "in_transit", "delivered", "returned"}
+SHIPMENT_TRANSITIONS["returned"] = set()
+
+ORDER_IN_FULFILMENT = {"paid", "accepted", "preparing", "ready_for_pickup"}
+
+# The local providers accept any webhook without a signature, so they exist only where no
+# real money or parcels move. Real providers are added to these maps unconditionally.
+_LOCAL_ENVIRONMENTS = {"local", "test"}
+
+
+def payment_providers() -> dict[str, PaymentProvider]:
+    if get_settings().environment in _LOCAL_ENVIRONMENTS:
+        return {"local": LocalPaymentProvider()}
+    return {}
+
+
+def shipping_providers() -> dict[str, ShippingProvider]:
+    if get_settings().environment in _LOCAL_ENVIRONMENTS:
+        return {"local": LocalShippingProvider()}
+    return {}
 
 
 class PaymentsService:
@@ -158,17 +195,32 @@ class PaymentsService:
             raise PaymentsValidationError("Listing not found.")
         if listing.seller_user_id != cart.seller_user_id:
             raise PaymentsValidationError("Listing does not belong to the cart's seller.")
-        if listing.status != "active":
+        if listing.status != "active" or not await ListingService(
+            self.repo.session, get_settings()
+        ).can_view(listing, actor):
             raise PaymentsValidationError("Listing is not available.")
-        price_cents = listing.price_amount_cents or 0
-        item = CartItem(
-            cart_id=cart.id,
-            currency="INR",
-            listing_id=listing.id,
-            price_snapshot_cents=price_cents,
-            quantity=payload.quantity,
-        )
-        self.repo.add(item)
+        price_cents = sale_price_cents(listing)
+        if any(existing.currency != listing.currency for existing in cart.items):
+            raise PaymentsValidationError("A cart can only hold books priced in one currency.")
+        existing_item = next((i for i in cart.items if i.listing_id == listing.id), None)
+        quantity = payload.quantity + (existing_item.quantity if existing_item else 0)
+        stock = await self.repo.get_listings_for_checkout([listing.id])
+        inventory = stock[listing.id].inventory
+        if inventory is None or inventory.quantity_available < quantity:
+            raise PaymentsValidationError("Not enough copies of this book are available.")
+        if existing_item is not None:
+            existing_item.quantity = quantity
+            existing_item.price_snapshot_cents = price_cents
+        else:
+            self.repo.add(
+                CartItem(
+                    cart_id=cart.id,
+                    currency=listing.currency,
+                    listing_id=listing.id,
+                    price_snapshot_cents=price_cents,
+                    quantity=quantity,
+                )
+            )
         await self.repo.commit()
         reloaded = await self.repo.get_cart_by_public_id(cart.public_id)
         if reloaded is None:
@@ -204,20 +256,57 @@ class PaymentsService:
     ) -> OrderResponse:
         cart = await self._get_cart(cart_id)
         require_cart_owner(cart, actor)
+        if cart.status == "checked_out":
+            # A retried or double-clicked checkout gets the order the first one made.
+            existing = await self.repo.get_order_for_cart(cart.id)
+            if existing is not None:
+                return order_response(existing)
         if cart.status != "active":
             raise InvalidOrderStateTransitionError("Only active carts can be checked out.")
         if not cart.items:
             raise PaymentsValidationError("Cart has no items.")
-        subtotal = sum(item.price_snapshot_cents * item.quantity for item in cart.items)
+        cart_public_id, seller_user_id = cart.public_id, cart.seller_user_id
+        if not await self.repo.claim_active_cart(cart.id):
+            await self.repo.rollback()
+            return await self._order_for_raced_checkout(cart_public_id)
+        listings = await self.repo.get_listings_for_checkout([i.listing_id for i in cart.items])
+        lines: list[tuple[CartItem, Listing, int]] = []
+        for cart_item in cart.items:
+            listing = listings.get(cart_item.listing_id)
+            try:
+                if listing is not None and listing.status == "reserved":
+                    raise InvalidOrderStateTransitionError(
+                        f"'{listing.title_snapshot}' has sold out. Remove it to check out."
+                    )
+                if listing is None or listing.status != "active":
+                    raise PaymentsValidationError("A book in this cart is no longer available.")
+                price = sale_price_cents(listing)
+                if not any(
+                    m.method == payload.fulfillment_method and m.enabled
+                    for m in listing.delivery_methods
+                ):
+                    method = payload.fulfillment_method
+                    raise PaymentsValidationError(
+                        f"'{listing.title_snapshot}' isn't offered for {method}."
+                    )
+                if not await self.repo.reserve_inventory(listing.id, cart_item.quantity):
+                    raise InvalidOrderStateTransitionError(
+                        f"'{listing.title_snapshot}' has sold out. Remove it to check out."
+                    )
+            except (PaymentsValidationError, InvalidOrderStateTransitionError):
+                await self.repo.rollback()  # undoes the cart claim and earlier reservations
+                raise
+            lines.append((cart_item, listing, price))
+        subtotal = sum(price * item.quantity for item, _, price in lines)
         platform_fee = int(subtotal * 0.025)
         total = subtotal + platform_fee
         order = Order(
             buyer_user_id=actor.id,
             cart_id=cart.id,
-            currency="INR",
+            currency=cart.items[0].currency,  # add_cart_item keeps one currency per cart
             fulfillment_method=payload.fulfillment_method,
             idempotency_key=payload.idempotency_key,
-            metadata_json={},
+            metadata_json={STOCK_RESERVED: True},
             platform_fee_cents=platform_fee,
             seller_user_id=cart.seller_user_id,
             status="awaiting_payment",
@@ -226,28 +315,39 @@ class PaymentsService:
         )
         self.repo.add(order)
         await self.repo.flush()
-        for cart_item in cart.items:
+        for cart_item, listing, price in lines:
             self.repo.add(
                 OrderItem(
-                    condition_snapshot="",
+                    condition_snapshot=listing.condition.condition if listing.condition else "",
                     currency=cart_item.currency,
                     listing_id=cart_item.listing_id,
                     order_id=order.id,
                     quantity=cart_item.quantity,
-                    title_snapshot="",
-                    unit_price_cents=cart_item.price_snapshot_cents,
+                    title_snapshot=listing.title_snapshot,
+                    unit_price_cents=price,
                 )
             )
-        cart.status = "checked_out"
+            if listing.inventory is not None:
+                await self.repo.session.refresh(listing.inventory)
+                if listing.inventory.quantity_available == 0:
+                    listing.status = "reserved"
         await self.audit(
             action=ORDER_CREATED,
             actor=actor,
             context=context,
-            payload={"order_id": order.public_id, "cart_id": cart.public_id},
-            target_user_id=cart.seller_user_id,
+            payload={"order_id": order.public_id, "cart_id": cart_public_id},
+            target_user_id=seller_user_id,
         )
-        await self.repo.commit()
-        reloaded = await self.repo.get_order_by_public_id(order.public_id)
+        order_public_id = order.public_id
+        try:
+            await self.repo.commit()
+        except IntegrityError:
+            # uq_orders_cart_id: another checkout of this cart committed first.
+            await self.repo.rollback()
+            return await self._order_for_raced_checkout(cart_public_id)
+        for _, listing_row, _ in lines:
+            await refresh_listing_search_document(listing_row.id)
+        reloaded = await self.repo.get_order_by_public_id(order_public_id)
         if reloaded is None:
             raise PaymentsValidationError("Order could not be loaded.")
         return order_response(reloaded)
@@ -265,7 +365,12 @@ class PaymentsService:
             raise ForbiddenPaymentsActionError("Only offer participants can create an order.")
         if offer.status != "accepted":
             raise InvalidOrderStateTransitionError("Only accepted offers can generate an order.")
+        existing = await self.repo.get_order_for_offer(offer.id)
+        if existing is not None:
+            return order_response(existing)
         amount = offer.amount_cents or 0
+        if amount % offer.quantity:
+            raise PaymentsValidationError("The offer amount doesn't split evenly across copies.")
         platform_fee = int(amount * 0.025)
         total = amount + platform_fee
         order = Order(
@@ -290,7 +395,7 @@ class PaymentsService:
                 order_id=order.id,
                 quantity=offer.quantity,
                 title_snapshot="",
-                unit_price_cents=amount,
+                unit_price_cents=amount // offer.quantity,  # the offer amount is for all copies
             )
         )
         await self.audit(
@@ -302,8 +407,17 @@ class PaymentsService:
                 offer.seller_user_id if actor.id == offer.buyer_user_id else offer.buyer_user_id
             ),
         )
-        await self.repo.commit()
-        reloaded = await self.repo.get_order_by_public_id(order.public_id)
+        offer_row_id, order_public_id = offer.id, order.public_id
+        try:
+            await self.repo.commit()
+        except IntegrityError:
+            # uq_orders_offer_id: both parties pressed "create order" at once.
+            await self.repo.rollback()
+            raced = await self.repo.get_order_for_offer(offer_row_id)
+            if raced is None:
+                raise
+            return order_response(raced)
+        reloaded = await self.repo.get_order_by_public_id(order_public_id)
         if reloaded is None:
             raise PaymentsValidationError("Order could not be loaded.")
         return order_response(reloaded)
@@ -350,6 +464,7 @@ class PaymentsService:
             )
         order.status = "cancelled"
         order.metadata_json = {**order.metadata_json, "cancel_reason": payload.reason}
+        released = await self._release_stock(order)
         await self.audit(
             action=ORDER_CANCELLED,
             actor=actor,
@@ -360,6 +475,8 @@ class PaymentsService:
             ),
         )
         await self.repo.commit()
+        for listing_id in released:
+            await refresh_listing_search_document(listing_id)
         reloaded = await self.repo.get_order_by_public_id(order.public_id)
         if reloaded is None:
             raise PaymentsValidationError("Order could not be loaded.")
@@ -387,7 +504,7 @@ class PaymentsService:
                 payment=payment_response(existing, order),
                 provider_data=provider_data,
             )
-        provider = PAYMENT_PROVIDERS.get(payload.provider)
+        provider = payment_providers().get(payload.provider)
         if provider is None:
             raise PaymentsValidationError(f"Unknown payment provider: {payload.provider}")
         try:
@@ -426,7 +543,7 @@ class PaymentsService:
         payload: bytes,
         signature: str,
     ) -> dict[str, str]:
-        payment_provider = PAYMENT_PROVIDERS.get(provider)
+        payment_provider = payment_providers().get(provider)
         if payment_provider is None:
             raise PaymentsValidationError(f"Unknown payment provider: {provider}")
         if not payment_provider.verify_webhook(payload, signature):
@@ -527,7 +644,7 @@ class PaymentsService:
         refund_amount = payload.amount_cents or available_to_refund
         if refund_amount > available_to_refund:
             raise PaymentsValidationError("Refund amount exceeds captured payment amount.")
-        provider = PAYMENT_PROVIDERS.get(captured_payment.provider)
+        provider = payment_providers().get(captured_payment.provider)
         if provider is None:
             raise PaymentsValidationError(f"Unknown payment provider: {captured_payment.provider}")
         if captured_payment.provider_payment_id is None:
@@ -588,7 +705,7 @@ class PaymentsService:
             raise InvalidOrderStateTransitionError(
                 "Shipments can only be created for accepted or preparing orders."
             )
-        shipping_provider = SHIPPING_PROVIDERS.get(payload.provider)
+        shipping_provider = shipping_providers().get(payload.provider)
         if shipping_provider is None:
             raise PaymentsValidationError(f"Unknown shipping provider: {payload.provider}")
         from_addr = payload.from_address.model_dump()
@@ -660,7 +777,7 @@ class PaymentsService:
         payload: bytes,
         signature: str,
     ) -> dict[str, str]:
-        shipping_provider = SHIPPING_PROVIDERS.get(provider)
+        shipping_provider = shipping_providers().get(provider)
         if shipping_provider is None:
             raise PaymentsValidationError(f"Unknown shipping provider: {provider}")
         if not shipping_provider.verify_webhook(payload, signature):
@@ -768,6 +885,9 @@ class PaymentsService:
         context: AuthenticatedRequestContext,
     ) -> DisputeResponse:
         dispute = await self._get_dispute(dispute_id)
+        # Resolving decides who gets the money, so neither side of the order may do it.
+        if not await self.repo.user_has_any_role(actor.id, MODERATOR_ROLES):
+            raise ForbiddenPaymentsActionError("Only a moderator can resolve disputes.")
         if dispute.status not in {"opened", "under_review"}:
             raise InvalidOrderStateTransitionError("Only open disputes can be resolved.")
         dispute.status = cast("DisputeStatus", payload.resolution)
@@ -790,6 +910,79 @@ class PaymentsService:
         return dispute_response(reloaded)
 
     # --- Internal helpers ---
+
+    # --- Background jobs (payments/tasks.py) ---
+
+    async def expire_unpaid_orders(self, cutoff: datetime, limit: int = 100) -> int:
+        """Cancels checkouts left unpaid since before cutoff and puts their copies back."""
+        expired = 0
+        for order in await self.repo.unpaid_orders_before(cutoff, limit):
+            if any(p.status in {"authorized", "captured"} for p in order.payments):
+                continue  # money is on its way; the webhook will move the order on
+            if not await self.repo.move_order_status(order.id, "awaiting_payment", "cancelled"):
+                continue
+            order.metadata_json = {**order.metadata_json, "cancel_reason": "Payment timed out"}
+            # An offer's own hold (expire_offer_holds) decides when its copy goes back.
+            released = await self._release_stock(order, include_offer=False)
+            await self.repo.commit()
+            for listing_id in released:
+                await refresh_listing_search_document(listing_id)
+            expired += 1
+        return expired
+
+    async def complete_protected_orders(self, cutoff: datetime, limit: int = 100) -> int:
+        """Completes orders delivered before cutoff that nobody disputed."""
+        completed = 0
+        for order in await self.repo.delivered_orders_before(cutoff, limit):
+            if not await self.repo.move_order_status(order.id, "delivered", "completed"):
+                continue
+            order.metadata_json = {**order.metadata_json, STOCK_RESERVED: False}  # sold
+            for item in order.items:
+                await self.repo.complete_listing_if_sold_out(item.listing_id)
+            await self.repo.commit()
+            for item in order.items:
+                await refresh_listing_search_document(item.listing_id)
+            completed += 1
+        return completed
+
+    async def expire_offer_holds(self, cutoff: datetime, limit: int = 100) -> int:
+        """Releases copies held for accepted offers that went nowhere since before cutoff."""
+        released = 0
+        for transaction in await self.repo.stale_offer_holds(cutoff, limit):
+            transaction.status = "cancelled"
+            transaction.cancelled_at = utc_now()
+            transaction.cancellation_reason = "Hold expired"
+            await self.repo.release_inventory(transaction.listing_id, transaction.quantity)
+            await self.repo.cancel_unpaid_offer_orders(transaction.offer_id)
+            await self.repo.commit()
+            await refresh_listing_search_document(transaction.listing_id)
+            released += 1
+        return released
+
+    async def _order_for_raced_checkout(self, cart_public_id: str) -> OrderResponse:
+        cart = await self._get_cart(cart_public_id)
+        existing = await self.repo.get_order_for_cart(cart.id)
+        if existing is None:
+            raise InvalidOrderStateTransitionError("Only active carts can be checked out.")
+        return order_response(existing)
+
+    async def _release_stock(self, order: Order, *, include_offer: bool = True) -> list[int]:
+        """Puts an unfulfilled order's copies back on sale. Safe to call more than once."""
+        if order.metadata_json.get(STOCK_RESERVED):
+            for item in order.items:
+                await self.repo.release_inventory(item.listing_id, item.quantity)
+            order.metadata_json = {**order.metadata_json, STOCK_RESERVED: False}
+            return [item.listing_id for item in order.items]
+        if order.offer_id is not None and include_offer:
+            # Offer orders hold stock through the accepted offer's transaction.
+            transaction = await self.repo.get_open_transaction_for_offer(order.offer_id)
+            if transaction is not None:
+                transaction.status = "cancelled"
+                transaction.cancelled_at = utc_now()
+                transaction.cancellation_reason = "Order cancelled"
+                await self.repo.release_inventory(transaction.listing_id, transaction.quantity)
+                return [transaction.listing_id]
+        return []
 
     async def _get_cart(self, cart_id: str) -> Cart:
         cart = await self.repo.get_cart_by_public_id(cart_id)
@@ -878,22 +1071,87 @@ class PaymentsService:
         normalized = f"{event_type} {data.get('status', '')}".lower()
         is_refund_event = "refund" in normalized
         if "refunded" in normalized or (is_refund_event and "succeeded" in normalized):
-            payment.status = "refunded"
+            target = "refunded"
+        elif any(token in normalized for token in ("captured", "succeeded", "paid")):
+            target = "captured"
+        elif "authorized" in normalized:
+            target = "authorized"
+        elif "failed" in normalized:
+            target = "failed"
+        else:
+            return
+        if target == "refunded" and not self._refund_event_is_full(payment, data):
+            return  # a partial refund: the payment stays captured for the rest
+        if target not in PAYMENT_TRANSITIONS.get(payment.status, set()):
+            # Providers resend and reorder events; a late one must not undo a later state.
+            logger.info(
+                "payment_webhook_ignored",
+                extra={"payment_id": payment.public_id, "from": payment.status, "to": target},
+            )
+            return
+        payment.status = cast("PaymentStatus", target)
+        order = payment.order
+        if target == "refunded":
             payment.refunded_at = payment.refunded_at or utc_now()
-            payment.order.status = "refunded"
-            return
-        if any(token in normalized for token in ("captured", "succeeded", "paid")):
-            payment.status = "captured"
+            if order.status not in {"cancelled", "refunded"}:
+                order.status = "refunded"
+        elif target == "captured":
             payment.captured_at = payment.captured_at or utc_now()
-            payment.order.status = "paid"
-            return
-        if "authorized" in normalized:
-            payment.status = "authorized"
-            return
-        if "failed" in normalized:
-            payment.status = "failed"
+            problem = capture_problem(payment, order, data)
+            if problem is not None:
+                # Money moved, but not what this order asked for: hold it for a person.
+                order.metadata_json = {**order.metadata_json, "payment_review": problem}
+                logger.error(
+                    "payment_capture_mismatch",
+                    extra={"order_id": order.public_id, "payment_id": payment.public_id, **problem},
+                )
+            elif order.status in {"created", "awaiting_payment"}:
+                order.status = "paid"
+            elif order.status == "cancelled":
+                # Paid after the order timed out or was cancelled: the buyer is owed a refund.
+                order.metadata_json = {**order.metadata_json, "payment_review": {"reason": "late"}}
+                logger.error(
+                    "payment_captured_for_cancelled_order",
+                    extra={"order_id": order.public_id, "payment_id": payment.public_id},
+                )
+        elif target == "failed":
             payment.failed_at = payment.failed_at or utc_now()
-            return
+
+    def _refund_event_is_full(self, payment: Payment, data: dict[str, Any]) -> bool:
+        """Marks the provider's refund succeeded; True once the whole payment is refunded."""
+        refund_id = data.get("provider_refund_id")
+        refund = next(
+            (r for r in payment.refunds if refund_id and r.provider_refund_id == refund_id), None
+        )
+        if refund is not None and refund.status != "succeeded":
+            refund.status = "succeeded"
+            refund.succeeded_at = utc_now()
+        amount = data.get("amount_cents")
+        if refund is None and not isinstance(amount, int):
+            return True  # the event doesn't say how much, so it is the provider's full refund
+        if refund is None and isinstance(amount, int):
+            # Refunded from the provider's dashboard, not through us: record it so later
+            # refunds add up.
+            payment.refunds.append(
+                Refund(
+                    amount_cents=amount,
+                    currency=payment.currency,
+                    initiated_at=utc_now(),
+                    order_id=payment.order_id,
+                    provider_refund_id=refund_id if isinstance(refund_id, str) else None,
+                    reason="Refunded at the payment provider",
+                    status="succeeded",
+                    succeeded_at=utc_now(),
+                )
+            )
+        refunded = sum(r.amount_cents for r in payment.refunds if r.status == "succeeded")
+        if refunded < payment.amount_cents:
+            logger.info(
+                "payment_partially_refunded",
+                extra={"payment_id": payment.public_id, "refunded_cents": refunded},
+            )
+            return False
+        return True
 
     async def _shipment_from_webhook(self, data: dict[str, Any]) -> Shipment | None:
         shipment_public_id = data.get("shipment_id")
@@ -909,12 +1167,24 @@ class PaymentsService:
     def _apply_shipping_webhook(self, shipment: Shipment, data: dict[str, Any]) -> None:
         status = data.get("status")
         if isinstance(status, str) and status:
-            shipment.status = cast("ShipmentStatus", status)
-            if status == "delivered":
-                shipment.delivered_at = shipment.delivered_at or utc_now()
-                shipment.order.status = "delivered"
-            elif status in {"picked_up", "in_transit"}:
-                shipment.order.status = "shipped"
+            if status not in SHIPMENT_TRANSITIONS.get(shipment.status, set()):
+                logger.info(
+                    "shipping_webhook_ignored",
+                    extra={
+                        "shipment_id": shipment.public_id,
+                        "from": shipment.status,
+                        "to": status,
+                    },
+                )
+            else:
+                shipment.status = cast("ShipmentStatus", status)
+                order = shipment.order
+                if status == "delivered":
+                    shipment.delivered_at = shipment.delivered_at or utc_now()
+                    if order.status in ORDER_IN_FULFILMENT | {"shipped"}:
+                        order.status = "delivered"
+                elif status in {"picked_up", "in_transit"} and order.status in ORDER_IN_FULFILMENT:
+                    order.status = "shipped"
         tracking_number = data.get("tracking_number")
         if isinstance(tracking_number, str) and tracking_number:
             shipment.tracking_number = tracking_number
@@ -946,11 +1216,33 @@ class PaymentsService:
 # --- Response builders ---
 
 
+# Set on orders whose copies were taken out of stock at checkout, until they go back.
+STOCK_RESERVED = "stock_reserved"
+
+
+def capture_problem(payment: Payment, order: Order, data: dict[str, Any]) -> dict[str, Any] | None:
+    """Why a capture doesn't pay for this order, or None when it does."""
+    amount = data.get("amount_cents", payment.amount_cents)
+    currency = str(data.get("currency", payment.currency)).upper()
+    if amount != order.total_cents or payment.amount_cents != order.total_cents:
+        return {"reason": "amount", "expected_cents": order.total_cents, "captured_cents": amount}
+    if currency != order.currency or payment.currency != order.currency:
+        return {"reason": "currency", "expected": order.currency, "captured": currency}
+    return None
+
+
+def sale_price_cents(listing: Listing) -> int:
+    if "sell" not in listing.listing_modes or not listing.price_amount_cents:
+        # Exchange, donate, lend and request listings go through offers, not the cart.
+        raise PaymentsValidationError("This book isn't for sale.")
+    return listing.price_amount_cents
+
+
 def cart_response(cart: Cart) -> CartResponse:
     return CartResponse(
         buyer=PaymentsUserSummary(id=cart.buyer.public_id),
         created_at=cart.created_at,
-        currency="INR",
+        currency=cart.items[0].currency if cart.items else "INR",
         id=cart.public_id,
         items=[
             CartItemResponse(

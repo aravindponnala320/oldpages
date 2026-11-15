@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
@@ -16,13 +17,30 @@ _engine: AsyncEngine | None = None
 _session_factory: async_sessionmaker[AsyncSession] | None = None
 
 
+def engine_options() -> dict[str, Any]:
+    settings = get_settings()
+    if not settings.database_url.startswith("postgresql"):
+        return {"pool_pre_ping": True}
+    return {
+        "pool_pre_ping": True,
+        "pool_size": settings.database_pool_size,
+        "max_overflow": settings.database_max_overflow,
+        "pool_timeout": settings.database_pool_timeout_seconds,
+        "pool_recycle": 1800,
+        "connect_args": {
+            "server_settings": {
+                "statement_timeout": str(settings.database_statement_timeout_ms),
+                # A session left mid-transaction (a crashed request) stops holding locks.
+                "idle_in_transaction_session_timeout": "30000",
+            }
+        },
+    }
+
+
 def get_engine() -> AsyncEngine:
     global _engine
     if _engine is None:
-        _engine = create_async_engine(
-            get_settings().database_url,
-            pool_pre_ping=True,
-        )
+        _engine = create_async_engine(get_settings().database_url, **engine_options())
     return _engine
 
 

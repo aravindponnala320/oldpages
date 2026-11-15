@@ -16,7 +16,6 @@ import { getAccessToken } from "../lib/auth";
 import { useAuth } from "./AuthContext";
 
 const STORAGE_KEY = "op:activeLocation";
-const CONSENT_KEY = "op:geoConsent";
 const COOKIE_NAME = "op_loc";
 const COOKIE_MAX_AGE_DAYS = 90;
 
@@ -42,9 +41,11 @@ type LocationContextType = {
   home: LocationPayload | null;
   source: LocationSource;
   isReady: boolean;
-  setActive: (location: LocationPayload, persistAsHome?: boolean) => Promise<void>;
+  setActive: (
+    location: LocationPayload,
+    persistAsHome?: boolean,
+  ) => Promise<void>;
   clear: () => Promise<void>;
-  requestBrowserLocation: () => Promise<LocationPayload | null>;
 };
 
 const LocationContext = createContext<LocationContextType | null>(null);
@@ -69,19 +70,8 @@ function writeStored(loc: LocationPayload | null): void {
   }
 }
 
-async function browserGeolocate(): Promise<GeolocationPosition | null> {
-  if (typeof navigator === "undefined" || !navigator.geolocation) return null;
-  return new Promise((resolve) => {
-    navigator.geolocation.getCurrentPosition(
-      (pos) => resolve(pos),
-      () => resolve(null),
-      { enableHighAccuracy: false, timeout: 8000, maximumAge: 5 * 60 * 1000 },
-    );
-  });
-}
-
 export function LocationProvider({ children }: { children: React.ReactNode }) {
-  const { user, isAuthenticated } = useAuth();
+  const { user } = useAuth();
   const [active, setActiveState] = useState<LocationPayload | null>(null);
   const [home, setHome] = useState<LocationPayload | null>(null);
   const [source, setSource] = useState<LocationSource>("unknown");
@@ -127,24 +117,6 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
     setActiveState(home);
     setSource(home ? "home" : "unknown");
   }, [home]);
-
-  const requestBrowserLocation = useCallback(async (): Promise<LocationPayload | null> => {
-    const pos = await browserGeolocate();
-    if (!pos) return null;
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(CONSENT_KEY, "granted");
-    }
-    const reversed = await apiClient
-      .reverseGeocode(pos.coords.latitude, pos.coords.longitude)
-      .catch(() => null);
-    const loc: LocationPayload = reversed ?? {
-      latitude: pos.coords.latitude,
-      longitude: pos.coords.longitude,
-    };
-    await persist(loc, isAuthenticated);
-    setSource("browser");
-    return loc;
-  }, [isAuthenticated, persist]);
 
   useEffect(() => {
     if (initialised.current) return;
@@ -217,15 +189,18 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
         /* ignore */
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
   const value = useMemo<LocationContextType>(
-    () => ({ active, home, source, isReady, setActive, clear, requestBrowserLocation }),
-    [active, home, source, isReady, setActive, clear, requestBrowserLocation],
+    () => ({ active, home, source, isReady, setActive, clear }),
+    [active, home, source, isReady, setActive, clear],
   );
 
-  return <LocationContext.Provider value={value}>{children}</LocationContext.Provider>;
+  return (
+    <LocationContext.Provider value={value}>
+      {children}
+    </LocationContext.Provider>
+  );
 }
 
 export function useLocation(): LocationContextType {

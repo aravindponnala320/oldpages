@@ -4,8 +4,12 @@ from typing import Any
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from conftest import RegisterUser
+from oldpages_api.identity.models import ConsentRecord
+from oldpages_api.identity.service import TERMS_VERSION
 
 
 @pytest.mark.asyncio
@@ -93,25 +97,81 @@ async def test_forgot_and_reset_password(
 
 
 @pytest.mark.asyncio
-async def test_oauth_does_not_auto_link_existing_password_account(
+async def test_oauth_links_verified_password_account(
+    client: AsyncClient,
+    register_user: RegisterUser,
+) -> None:
+    registered = await register_user(client)
+    await client.post(
+        "/api/v1/auth/verify-email",
+        json={"token": registered["email_verification"]["token"]},
+    )
+
+    response = await client.post(
+        "/api/v1/auth/oauth/google",
+        json={"id_token": "dev:google:google-reader-1:reader@example.com"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["user"]["id"] == registered["user"]["id"]
+    password_login = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "reader@example.com", "password": "correct horse battery staple"},
+    )
+    assert password_login.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_oauth_link_to_unverified_account_drops_password_and_sessions(
+    client: AsyncClient,
+    register_user: RegisterUser,
+) -> None:
+    registered = await register_user(client)
+
+    response = await client.post(
+        "/api/v1/auth/oauth/google",
+        json={"id_token": "dev:google:google-reader-1:reader@example.com"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["user"]["id"] == registered["user"]["id"]
+    assert response.json()["user"]["email_verified"] is True
+    password_login = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "reader@example.com", "password": "correct horse battery staple"},
+    )
+    assert password_login.status_code == 401
+    old_refresh = await client.post(
+        "/api/v1/auth/refresh",
+        json={"refresh_token": registered["tokens"]["refresh_token"]},
+    )
+    assert old_refresh.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_oauth_rejects_second_account_from_same_provider(
     client: AsyncClient,
     register_user: RegisterUser,
 ) -> None:
     await register_user(client)
+    await client.post(
+        "/api/v1/auth/oauth/google",
+        json={"id_token": "dev:google:google-reader-1:reader@example.com"},
+    )
 
     response = await client.post(
         "/api/v1/auth/oauth/google",
-        json={
-            "expected_email": "reader@example.com",
-            "id_token": "dev:google:google-reader-1:reader@example.com",
-        },
+        json={"id_token": "dev:google:google-reader-2:reader@example.com"},
     )
 
     assert response.status_code == 403
 
 
 @pytest.mark.asyncio
-async def test_oauth_creates_new_development_account(client: AsyncClient) -> None:
+async def test_oauth_creates_new_development_account(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
     response = await client.post(
         "/api/v1/auth/oauth/google",
         json={"id_token": "dev:google:google-reader-2:oauth@example.com"},
@@ -120,3 +180,6 @@ async def test_oauth_creates_new_development_account(client: AsyncClient) -> Non
     assert response.status_code == 200
     assert response.json()["user"]["email"] == "oauth@example.com"
     assert response.json()["user"]["email_verified"] is True
+    async with session_factory() as session:
+        consents = (await session.execute(select(ConsentRecord))).scalars().all()
+    assert [c.terms_version for c in consents] == [TERMS_VERSION]

@@ -26,12 +26,12 @@ import type { EventResponse, EventType } from "@oldpages/shared-types";
 
 const EVENT_TYPE_LABELS: Partial<Record<EventType, string>> = {
   book_club_meeting: "Book Club",
-  book_exchange:     "Book Exchange",
-  used_book_fair:    "Book Fair",
-  donation_drive:    "Donation Drive",
-  author_meetup:     "Author Meetup",
-  signing:           "Signing",
-  reading_session:   "Reading Session",
+  book_exchange: "Book Exchange",
+  used_book_fair: "Book Fair",
+  donation_drive: "Donation Drive",
+  author_meetup: "Author Meetup",
+  signing: "Signing",
+  reading_session: "Reading Session",
   online_discussion: "Online Discussion",
 };
 
@@ -45,7 +45,8 @@ function EventCard({
   rsvpLoading: boolean;
 }) {
   const isOnline = !!event.online_url;
-  const typeLabel = EVENT_TYPE_LABELS[event.event_type] ?? event.event_type.replace(/_/g, " ");
+  const typeLabel =
+    EVENT_TYPE_LABELS[event.event_type] ?? event.event_type.replace(/_/g, " ");
   const isPast = new Date(event.ends_at) < new Date();
 
   return (
@@ -58,7 +59,9 @@ function EventCard({
         boxShadow: shadow.sm,
       }}
     >
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+      <div
+        style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}
+      >
         <Badge variant="info" label={typeLabel} />
         {isOnline && <Badge label="Online" />}
         {isPast && <Badge label="Past" />}
@@ -76,29 +79,63 @@ function EventCard({
           {event.title}
         </h3>
       </Link>
-      <div style={{ display: "flex", flexDirection: "column", gap: 3, marginBottom: 12 }}>
-        <p style={{ margin: 0, fontSize: font.size.sm, color: colors.textSubtle }}>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 3,
+          marginBottom: 12,
+        }}
+      >
+        <p
+          style={{
+            margin: 0,
+            fontSize: font.size.sm,
+            color: colors.textSubtle,
+          }}
+        >
           {new Date(event.starts_at).toLocaleDateString(undefined, {
             weekday: "short",
             month: "short",
             day: "numeric",
           })}
           {" · "}
-          {new Date(event.starts_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+          {new Date(event.starts_at).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
         </p>
         {event.location_name && (
-          <p style={{ margin: 0, fontSize: font.size.sm, color: colors.textSubtle }}>
+          <p
+            style={{
+              margin: 0,
+              fontSize: font.size.sm,
+              color: colors.textSubtle,
+            }}
+          >
             {event.location_name}
           </p>
         )}
-        <p style={{ margin: 0, fontSize: font.size.xs, color: colors.textFaint }}>
-          {event.rsvp_count} going{event.waitlist_count > 0 ? ` · ${event.waitlist_count} waitlisted` : ""}
+        <p
+          style={{ margin: 0, fontSize: font.size.xs, color: colors.textFaint }}
+        >
+          {event.rsvp_count} going
+          {event.waitlist_count > 0
+            ? ` · ${event.waitlist_count} waitlisted`
+            : ""}
         </p>
       </div>
       <div style={{ display: "flex", gap: 8 }}>
-        <LinkButton href={`/events/${event.id}`} variant="secondary" size="sm">View</LinkButton>
+        <LinkButton href={`/events/${event.id}`} variant="secondary" size="sm">
+          View
+        </LinkButton>
         {!isPast && event.status === "scheduled" && (
-          <Button variant="primary" size="sm" loading={rsvpLoading} onClick={() => onRsvp(event.id)}>
+          <Button
+            variant="primary"
+            size="sm"
+            loading={rsvpLoading}
+            onClick={() => onRsvp(event.id)}
+          >
             RSVP
           </Button>
         )}
@@ -116,7 +153,9 @@ export default function EventsPage() {
   const [loading, setLoading] = useState(true);
   const [rsvpLoading, setRsvpLoading] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<EventType | "">("");
-  const [onlineFilter, setOnlineFilter] = useState<"all" | "online" | "in_person">("all");
+  const [onlineFilter, setOnlineFilter] = useState<
+    "all" | "online" | "in_person"
+  >("all");
 
   useEffect(() => {
     loadEvents();
@@ -146,7 +185,9 @@ export default function EventsPage() {
     try {
       await apiClient.createEventRsvp(eventId, {}, token);
       setEvents((prev) =>
-        prev.map((e) => (e.id === eventId ? { ...e, rsvp_count: e.rsvp_count + 1 } : e)),
+        prev.map((e) =>
+          e.id === eventId ? { ...e, rsvp_count: e.rsvp_count + 1 } : e,
+        ),
       );
       toast("RSVP confirmed", "success");
     } catch {
@@ -170,36 +211,61 @@ export default function EventsPage() {
           eyebrow="Community"
           title="Events"
           subtitle="Book fairs, clubs, author meetups, and more near you."
-          actions={<Button variant="secondary" onClick={loadEvents}>Refresh</Button>}
+          actions={
+            <Button variant="secondary" onClick={loadEvents}>
+              Refresh
+            </Button>
+          }
         />
 
-        <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: 12,
+            marginBottom: 20,
+            flexWrap: "wrap",
+            alignItems: "center",
+          }}
+        >
           <Select
             containerStyle={{ width: 200 }}
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value as EventType | "")}
             options={[
               { value: "", label: "All types" },
-              ...Object.entries(EVENT_TYPE_LABELS).map(([val, label]) => ({ value: val, label: label! })),
+              ...Object.entries(EVENT_TYPE_LABELS).map(([val, label]) => ({
+                value: val,
+                label: label!,
+              })),
             ]}
           />
           <Select
             containerStyle={{ width: 200 }}
             value={onlineFilter}
-            onChange={(e) => setOnlineFilter(e.target.value as typeof onlineFilter)}
+            onChange={(e) =>
+              setOnlineFilter(e.target.value as typeof onlineFilter)
+            }
             options={[
               { value: "all", label: "Online & In-Person" },
               { value: "online", label: "Online only" },
               { value: "in_person", label: "In-person only" },
             ]}
           />
-          <span style={{ color: colors.textFaint, fontSize: font.size.sm, marginLeft: "auto" }}>
+          <span
+            style={{
+              color: colors.textFaint,
+              fontSize: font.size.sm,
+              marginLeft: "auto",
+            }}
+          >
             {filtered.length} event{filtered.length !== 1 ? "s" : ""}
           </span>
         </div>
 
         {loading && (
-          <div style={{ display: "flex", justifyContent: "center", padding: 40 }}>
+          <div
+            style={{ display: "flex", justifyContent: "center", padding: 40 }}
+          >
             <Spinner size="md" />
           </div>
         )}
@@ -212,9 +278,21 @@ export default function EventsPage() {
           />
         )}
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 16 }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns:
+              "repeat(auto-fill, minmax(min(100%, 320px), 1fr))",
+            gap: 16,
+          }}
+        >
           {filtered.map((e) => (
-            <EventCard key={e.id} event={e} onRsvp={handleRsvp} rsvpLoading={rsvpLoading === e.id} />
+            <EventCard
+              key={e.id}
+              event={e}
+              onRsvp={handleRsvp}
+              rsvpLoading={rsvpLoading === e.id}
+            />
           ))}
         </div>
       </Container>

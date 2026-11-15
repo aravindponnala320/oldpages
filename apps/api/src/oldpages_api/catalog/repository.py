@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from sqlalchemy import Select, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -17,11 +19,21 @@ from oldpages_api.catalog.models import (
     Category,
     Publisher,
 )
+from oldpages_api.identity.models import UserPreference
 
 
 class CatalogRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
+
+    async def user_has_any_role(self, user_id: int, roles: tuple[str, ...]) -> bool:
+        # Roles live in user preferences (see trust.repository.user_has_role).
+        result = await self.session.execute(
+            select(UserPreference.metadata_json).where(UserPreference.user_id == user_id)
+        )
+        metadata: dict[str, Any] = result.scalar_one_or_none() or {}
+        granted = metadata.get("roles", [])
+        return isinstance(granted, list) and any(role in granted for role in roles)
 
     async def get_edition_by_public_id(self, public_id: str) -> BookEdition | None:
         result = await self.session.execute(
@@ -218,7 +230,7 @@ def edition_load_options() -> tuple[ExecutableOption, ...]:
 
 
 def apply_book_filters(
-    statement: Select[tuple[BookEdition]],
+    statement: Select[BookEdition],
     *,
     author: str | None,
     category: Category | None,
@@ -226,7 +238,7 @@ def apply_book_filters(
     language: str | None,
     publisher: str | None,
     query: str | None,
-) -> Select[tuple[BookEdition]]:
+) -> Select[BookEdition]:
     if identifier:
         identifier_type, identifier_value = identifier
         statement = statement.where(

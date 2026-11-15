@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import delete, func, or_, select
+from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from oldpages_api.identity.models import (
@@ -105,6 +105,29 @@ class IdentityRepository:
             )
         )
         return result.scalar_one_or_none()
+
+    async def has_social_account(self, user_id: int, provider: str) -> bool:
+        result = await self.session.execute(
+            select(SocialAccount.id).where(
+                SocialAccount.user_id == user_id,
+                SocialAccount.provider == provider,
+            )
+        )
+        return result.first() is not None
+
+    async def expire_verifications(
+        self, *, user_id: int, verification_type: str, now: datetime
+    ) -> None:
+        """Use up every open link of this type, so only the newest (or none) still works."""
+        await self.session.execute(
+            update(UserVerification)
+            .where(
+                UserVerification.user_id == user_id,
+                UserVerification.verification_type == verification_type,
+                UserVerification.consumed_at.is_(None),
+            )
+            .values(consumed_at=now)
+        )
 
     async def get_verification_by_token_hash(self, token_hash: str) -> UserVerification | None:
         result = await self.session.execute(

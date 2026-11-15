@@ -1,0 +1,122 @@
+name: Deploy
+
+# Production deploys only ever run on code that passed CI on main.
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: ["main"]
+  workflow_dispatch: # manual re-deploy of main from the Actions tab
+
+permissions:
+  contents: read
+
+# One deploy at a time; a newer push waits instead of racing the one in progress.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  # Public values, baked into the browser bundles at build time.
+  NEXT_PUBLIC_API_BASE_URL: ${{ vars.NEXT_PUBLIC_API_BASE_URL || 'https://oldpages-api.fly.dev' }}
+  API_BASE_URL: ${{ vars.NEXT_PUBLIC_API_BASE_URL || 'https://oldpages-api.fly.dev' }}
+  NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${{ vars.NEXT_PUBLIC_GOOGLE_CLIENT_ID }}
+  NEXT_PUBLIC_MEDIA_BASE_URL: ${{ vars.NEXT_PUBLIC_MEDIA_BASE_URL }}
+
+jobs:
+  gate:
+    name: CI passed
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
+    outputs:
+      sha: ${{ steps.sha.outputs.sha }}
+    steps:
+      - id: sha
+        run: echo "sha=${{ github.event.workflow_run.head_sha || github.sha }}" >> "$GITHUB_OUTPUT"
+
+  api:
+    name: API (migrations run first)
+    needs: gate
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.gate.outputs.sha }}
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      # fly.toml's release_command runs `alembic upgrade head` before new machines take
+      # traffic; if a migration fails the deploy stops and the old version keeps serving.
+      - name: Deploy API
+        working-directory: apps/api
+        run: flyctl deploy -c fly.toml --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+  worker:
+    name: Worker
+    needs: [gate, api]
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.gate.outputs.sha }}
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Deploy worker
+        working-directory: apps/api
+        run: flyctl deploy -c fly.worker.toml --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+  frontends:
+    name: ${{ matrix.app }}
+    needs: [gate, api]
+    runs-on: ubuntu-latest
+    environment: production
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [web, admin]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.gate.outputs.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Build and deploy to Cloudflare
+        working-directory: apps/${{ matrix.app }}
+        run: npx opennextjs-cloudflare build && npx opennextjs-cloudflare deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+
+  smoke:
+    name: Live checks
+    needs: [worker, frontends]
+    runs-on: ubuntu-latest
+    steps:
+      - name: API is healthy
+        run: |
+          for i in 1 2 3 4 5 6; do
+            body=$(curl -fsS --max-time 30 "$API_BASE_URL/health/ready") && break
+            sleep 10
+          done
+          echo "$body"
+          echo "$body" | grep -q '"status":"ok"'
+      - name: Search and categories answer
+        run: |
+          curl -fsS --max-time 30 -o /dev/null "$API_BASE_URL/api/v1/search/listings?limit=5"
+          curl -fsS --max-time 30 -o /dev/null "$API_BASE_URL/api/v1/categories"
+      - name: Sites load
+        run: |
+          for url in https://oldpages.in https://www.oldpages.in https://admin.oldpages.in/login; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "$url")
+            echo "$url $code"
+            test "$code" = 200
+          done

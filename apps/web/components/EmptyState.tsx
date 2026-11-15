@@ -14,6 +14,17 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   const iconNode =
-    typeof icon === "string" ? <span style={{ fontSize: 28 }}>{icon}</span> : icon;
-  return <UIEmptyState title={title} description={body} icon={iconNode} action={action} />;
+    typeof icon === "string" ? (
+      <span style={{ fontSize: 28 }}>{icon}</span>
+    ) : (
+      icon
+    );
+  return (
+    <UIEmptyState
+      title={title}
+      description={body}
+      icon={iconNode}
+      action={action}
+    />
+  );
 }

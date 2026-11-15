@@ -45,7 +45,9 @@ async def register(
     return await identity_service(request, session).register(payload, request_context(request))
 
 
-@router.post("/register/superuser", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/register/superuser", response_model=AuthResponse, status_code=status.HTTP_201_CREATED
+)
 async def register_superuser(
     payload: RegisterRequest,
     request: Request,
@@ -54,7 +56,9 @@ async def register_superuser(
 ) -> AuthResponse:
     if not principal.user.is_superuser:
         raise ForbiddenIdentityActionError("Only superusers can create superuser accounts.")
-    return await identity_service(request, session).register_superuser(payload, request_context(request))
+    return await identity_service(request, session).register_superuser(
+        payload, request_context(request)
+    )
 
 
 @router.post("/login", response_model=AuthResponse)

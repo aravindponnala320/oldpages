@@ -56,28 +56,45 @@ function VerifyEmailInner() {
     state === "success"
       ? colors.primary
       : state === "error"
-      ? colors.dangerText
-      : colors.text;
+        ? colors.dangerText
+        : colors.text;
 
   return (
     <div>
-      <h1 style={{ fontSize: font.size["2xl"], fontWeight: font.weight.heavy, margin: "0 0 10px", color }}>
+      <h1
+        style={{
+          fontSize: font.size["2xl"],
+          fontWeight: font.weight.heavy,
+          margin: "0 0 10px",
+          color,
+        }}
+      >
         {state === "verifying" && "Verifying your email..."}
         {state === "success" && "Email verified"}
         {state === "error" && "Could not verify"}
       </h1>
-      <p style={{ color: colors.textSubtle, fontSize: font.size.base, lineHeight: 1.5 }}>
+      <p
+        style={{
+          color: colors.textSubtle,
+          fontSize: font.size.base,
+          lineHeight: 1.5,
+        }}
+      >
         {message}
       </p>
       {state === "error" && (
         <Link
           href="/login"
           style={{
-            display: "block", textAlign: "center",
+            display: "block",
+            textAlign: "center",
             border: `1px solid ${colors.borderStrong}`,
-            borderRadius: radius.lg, padding: "12px",
-            fontSize: font.size.base, fontWeight: font.weight.semibold,
-            color: colors.text, textDecoration: "none",
+            borderRadius: radius.lg,
+            padding: "12px",
+            fontSize: font.size.base,
+            fontWeight: font.weight.semibold,
+            color: colors.text,
+            textDecoration: "none",
             background: colors.surface,
             marginTop: 24,
           }}

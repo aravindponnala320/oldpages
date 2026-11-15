@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import logging
 import secrets
 import string
 from datetime import UTC, datetime, timedelta
 from typing import cast
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from oldpages_api.commerce.events import (
@@ -69,6 +71,7 @@ from oldpages_api.identity.security import utc_now
 from oldpages_api.listings.models import Listing
 from oldpages_api.listings.tasks import refresh_listing_search_document
 
+logger = logging.getLogger(__name__)
 DEFAULT_OFFER_EXPIRY = timedelta(hours=48)
 
 
@@ -91,7 +94,7 @@ class CommerceService:
             amount_cents=payload.amount_cents,
             bundle_listing_ids_json=list(payload.bundle_listing_ids),
             buyer_user_id=actor.id,
-            currency=payload.currency,
+            currency=listing.currency,  # offers are always in the listing's currency
             expires_at=expires_at,
             fulfillment_method=payload.fulfillment_method,
             listing_id=listing.id,
@@ -135,7 +138,7 @@ class CommerceService:
             amount_cents=payload.amount_cents,
             bundle_listing_ids_json=list(offer.bundle_listing_ids_json),
             buyer_user_id=offer.buyer_user_id,
-            currency=payload.currency,
+            currency=offer.currency,
             expires_at=expires_at,
             fulfillment_method=payload.fulfillment_method or offer.fulfillment_method,
             listing_id=offer.listing_id,
@@ -209,9 +212,15 @@ class CommerceService:
             payload={"offer_id": offer.public_id, "listing_id": offer.listing.public_id},
             target_user_id=other_offer_user_id(offer, actor.id),
         )
-        await self.repo.commit()
-        await refresh_listing_search_document(offer.listing_id)
-        reloaded = await self.get_offer_model(offer.public_id)
+        offer_public_id, listing_id = offer.public_id, offer.listing_id
+        try:
+            await self.repo.commit()
+        except IntegrityError as exc:
+            # Two accepts raced; uq_transactions_offer_id let only one through.
+            await self.repo.rollback()
+            raise InvalidCommerceStateTransitionError("This offer was already accepted.") from exc
+        await refresh_listing_search_document(listing_id)
+        reloaded = await self.get_offer_model(offer_public_id)
         await self._broadcast_offer(reloaded, "offer.updated")
         return offer_response(reloaded)
 
@@ -359,7 +368,11 @@ class CommerceService:
                 "Only reserved transactions can be completed."
             )
         pickup = latest_pickup(transaction)
-        if transaction.fulfillment_method == "pickup" and pickup is not None and pickup.status == "confirmed":
+        if (
+            transaction.fulfillment_method == "pickup"
+            and pickup is not None
+            and pickup.status == "confirmed"
+        ):
             if payload.handover_code != pickup.handover_code:
                 raise CommerceValidationError("The handover code is incorrect.")
             pickup.status = "completed"
@@ -385,6 +398,7 @@ class CommerceService:
 
     async def _broadcast_offer(self, offer: Offer, event_type: str) -> None:
         from oldpages_api.chat.tasks import publish_user_event
+
         resp = offer_response(offer)
         payload = {"offer_id": offer.public_id, "offer": resp.model_dump(mode="json")}
         for user in [offer.buyer, offer.seller]:
@@ -393,8 +407,12 @@ class CommerceService:
 
     async def _broadcast_txn(self, transaction: Transaction, actor: User, event_type: str) -> None:
         from oldpages_api.chat.tasks import publish_user_event
+
         resp = transaction_response(transaction, actor)
-        payload = {"transaction_id": transaction.public_id, "transaction": resp.model_dump(mode="json")}
+        payload = {
+            "transaction_id": transaction.public_id,
+            "transaction": resp.model_dump(mode="json"),
+        }
         # Broadcast to both parties
         for user in [transaction.buyer, transaction.seller]:
             if user and user.public_id:
@@ -408,6 +426,7 @@ class CommerceService:
         context: AuthenticatedRequestContext,
     ) -> TransactionResponse:
         from oldpages_api.commerce.events import TRANSACTION_CANCELLED
+
         transaction = await self.get_transaction_model(transaction_id)
         require_transaction_participant(actor, transaction)
         if transaction.status in {"completed", "cancelled"}:
@@ -445,11 +464,13 @@ class CommerceService:
         actor: User,
         context: AuthenticatedRequestContext,
     ) -> TransactionResponse:
-        """Buyer marks that they received the book. Auto-completes if seller also marked delivered."""
+        """Buyer marks the book received; completes if the seller already marked it delivered."""
         from oldpages_api.commerce.events import TRANSACTION_MARKED_RECEIVED
+
         transaction = await self.get_transaction_model(transaction_id)
         if transaction.buyer_user_id != actor.id:
             from oldpages_api.commerce.exceptions import ForbiddenCommerceActionError
+
             raise ForbiddenCommerceActionError("Only the buyer can mark as received.")
         if transaction.status in {"completed", "cancelled"}:
             raise InvalidCommerceStateTransitionError(
@@ -483,10 +504,11 @@ class CommerceService:
         actor: User,
         context: AuthenticatedRequestContext,
     ) -> TransactionResponse:
-        """Seller marks that they delivered the book. Auto-completes if buyer also marked received."""
+        """Seller marks the book delivered; completes if the buyer already marked it received."""
         transaction = await self.get_transaction_model(transaction_id)
         if transaction.seller_user_id != actor.id:
             from oldpages_api.commerce.exceptions import ForbiddenCommerceActionError
+
             raise ForbiddenCommerceActionError("Only the seller can mark as delivered.")
         if transaction.status in {"completed", "cancelled"}:
             raise InvalidCommerceStateTransitionError(
@@ -604,7 +626,9 @@ class CommerceService:
             listing = await self.repo.get_listing_by_public_id(listing_id)
             if listing:
                 listing_db_id = listing.id
-        offers = await self.repo.list_offers_for_user(actor.id, role=role, listing_id=listing_db_id, limit=limit)
+        offers = await self.repo.list_offers_for_user(
+            actor.id, role=role, listing_id=listing_db_id, limit=limit
+        )
         return [offer_response(o) for o in offers]
 
     async def list_transactions(
@@ -620,6 +644,7 @@ class CommerceService:
         offer = await self.get_offer_model(offer_id)
         if offer.buyer_user_id != actor.id and offer.seller_user_id != actor.id:
             from oldpages_api.commerce.exceptions import ForbiddenCommerceActionError
+
             raise ForbiddenCommerceActionError("You are not a party to this offer.")
         return offer_response(offer)
 
@@ -627,6 +652,7 @@ class CommerceService:
         txn = await self.get_transaction_model(transaction_id)
         if txn.buyer_user_id != actor.id and txn.seller_user_id != actor.id:
             from oldpages_api.commerce.exceptions import ForbiddenCommerceActionError
+
             raise ForbiddenCommerceActionError("You are not a party to this transaction.")
         return transaction_response(txn, actor)
 
@@ -760,14 +786,15 @@ def _user_summary(user: object) -> CommerceUserSummary:
     display_name: str | None = None
     try:
         from sqlalchemy import inspect as sa_inspect
+
         state = sa_inspect(user)
         # Only access .profile if already loaded (not deferred/unloaded)
         if "profile" not in state.unloaded:
             profile = user.profile  # type: ignore[attr-defined]
             if profile is not None:
                 display_name = getattr(profile, "display_name", None)
-    except Exception:
-        pass
+    except Exception:  # an unloaded profile only costs the display name
+        logger.debug("no profile for user summary", exc_info=True)
     return CommerceUserSummary(id=uid, display_name=display_name)
 
 

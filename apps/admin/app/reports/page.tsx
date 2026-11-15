@@ -59,7 +59,9 @@ export default function ReportsPage() {
       const params = new URLSearchParams();
       params.set("limit", String(LIMIT));
       if (filterStatus) params.set("status", filterStatus);
-      const data = await adminFetch<ModerationCasesResponse>(`/admin/moderation/cases?${params}`);
+      const data = await adminFetch<ModerationCasesResponse>(
+        `/admin/moderation/cases?${params}`,
+      );
       const mapped = (data.items ?? [])
         .map((item) => ({
           id: item.report.id,
@@ -83,12 +85,15 @@ export default function ReportsPage() {
     }
   }
 
-  useEffect(() => { fetchReports(); }, [offset, filterType, filterSeverity, filterStatus]);
+  useEffect(() => {
+    fetchReports();
+  }, [offset, filterType, filterSeverity, filterStatus]);
 
   function toggleSelect(id: string) {
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   }
@@ -113,8 +118,8 @@ export default function ReportsPage() {
               reason: "Marked as reviewing",
               metadata: { source: "reports_bulk_review" },
             }),
-          })
-        )
+          }),
+        ),
       );
       fetchReports();
     } catch (err) {
@@ -156,30 +161,57 @@ export default function ReportsPage() {
         <h1 className="admin-page-title">Reports Queue</h1>
         <div style={{ display: "flex", gap: ".5rem", alignItems: "center" }}>
           {selected.size > 0 && (
-            <button className="admin-btn admin-btn-primary admin-btn-sm" onClick={bulkMarkReviewed} disabled={bulkLoading}>
+            <button
+              className="admin-btn admin-btn-primary admin-btn-sm"
+              onClick={bulkMarkReviewed}
+              disabled={bulkLoading}
+            >
               {bulkLoading ? "Processing…" : `Mark ${selected.size} Reviewing`}
             </button>
           )}
-          <span style={{ fontSize: ".875rem", color: "#5c6670" }}>{total} total</span>
+          <span style={{ fontSize: ".875rem", color: "#5c6670" }}>
+            {total} total
+          </span>
         </div>
       </div>
 
       <div className="admin-filter-bar">
-        <select className="admin-select" value={filterType} onChange={(e) => { setFilterType(e.target.value); setOffset(0); }}>
+        <select
+          className="admin-select"
+          value={filterType}
+          onChange={(e) => {
+            setFilterType(e.target.value);
+            setOffset(0);
+          }}
+        >
           <option value="">All types</option>
           <option value="user">User</option>
           <option value="listing">Listing</option>
           <option value="message">Message</option>
           <option value="community">Community</option>
         </select>
-        <select className="admin-select" value={filterSeverity} onChange={(e) => { setFilterSeverity(e.target.value); setOffset(0); }}>
+        <select
+          className="admin-select"
+          value={filterSeverity}
+          onChange={(e) => {
+            setFilterSeverity(e.target.value);
+            setOffset(0);
+          }}
+        >
           <option value="">All severities</option>
           <option value="critical">Critical</option>
           <option value="high">High</option>
           <option value="medium">Medium</option>
           <option value="low">Low</option>
         </select>
-        <select className="admin-select" value={filterStatus} onChange={(e) => { setFilterStatus(e.target.value); setOffset(0); }}>
+        <select
+          className="admin-select"
+          value={filterStatus}
+          onChange={(e) => {
+            setFilterStatus(e.target.value);
+            setOffset(0);
+          }}
+        >
           <option value="">All statuses</option>
           <option value="open">Open</option>
           <option value="in_review">In Review</option>
@@ -189,10 +221,25 @@ export default function ReportsPage() {
         </select>
       </div>
 
-      {loading && <div style={{ display: "flex", justifyContent: "center", padding: "2rem" }}><span className="spinner" /></div>}
+      {loading && (
+        <div
+          style={{ display: "flex", justifyContent: "center", padding: "2rem" }}
+        >
+          <span className="spinner" />
+        </div>
+      )}
 
       {error && (
-        <div style={{ background: "#fee2e2", color: "#991b1b", padding: ".75rem", borderRadius: 6, marginBottom: "1rem", fontSize: ".875rem" }}>
+        <div
+          style={{
+            background: "#fee2e2",
+            color: "#991b1b",
+            padding: ".75rem",
+            borderRadius: 6,
+            marginBottom: "1rem",
+            fontSize: ".875rem",
+          }}
+        >
           {error}
         </div>
       )}
@@ -203,7 +250,15 @@ export default function ReportsPage() {
             <table className="admin-table">
               <thead>
                 <tr>
-                  <th><input type="checkbox" checked={selected.size === reports.length && reports.length > 0} onChange={toggleAll} /></th>
+                  <th>
+                    <input
+                      type="checkbox"
+                      checked={
+                        selected.size === reports.length && reports.length > 0
+                      }
+                      onChange={toggleAll}
+                    />
+                  </th>
                   <th>ID</th>
                   <th>Type</th>
                   <th>Reason</th>
@@ -217,35 +272,98 @@ export default function ReportsPage() {
               </thead>
               <tbody>
                 {reports.length === 0 ? (
-                  <tr><td colSpan={10} style={{ textAlign: "center", color: "#5c6670", padding: "2rem" }}>No reports found</td></tr>
-                ) : reports.map((report) => (
-                  <tr key={report.case_id} style={{ cursor: "pointer" }} onClick={() => router.push(`/reports/${report.case_id}`)}>
-                    <td onClick={(e) => e.stopPropagation()}>
-                      <input type="checkbox" checked={selected.has(report.case_id)} onChange={() => toggleSelect(report.case_id)} />
-                    </td>
-                    <td style={{ fontFamily: "monospace", fontSize: ".8rem" }}>{report.id.slice(0, 8)}…</td>
-                    <td><span className="admin-badge admin-badge-blue">{report.report_type}</span></td>
-                    <td style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{report.reason}</td>
-                    <td style={{ fontSize: ".8rem" }}>{report.reporter_id ?? "—"}</td>
-                    <td style={{ fontFamily: "monospace", fontSize: ".8rem" }}>{report.target_id ? report.target_id.slice(0, 8) + "…" : "—"}</td>
-                    <td>
-                      <span className={`admin-badge ${severityColor[report.severity] ?? "admin-badge-gray"}`}>
-                        {report.severity}
-                      </span>
-                    </td>
-                    <td>
-                      <span className={`admin-badge ${
-                        report.status === "open" ? "admin-badge-yellow" :
-                        report.status === "in_review" ? "admin-badge-blue" :
-                        report.status === "actioned" ? "admin-badge-green" : "admin-badge-gray"
-                      }`}>{report.status}</span>
-                    </td>
-                    <td style={{ fontSize: ".8rem", color: "#5c6670" }}>{new Date(report.created_at).toLocaleDateString()}</td>
-                    <td onClick={(e) => e.stopPropagation()}>
-                      <button className="admin-btn admin-btn-secondary admin-btn-sm" onClick={() => assignToMe(report.case_id)}>Assign to me</button>
+                  <tr>
+                    <td
+                      colSpan={10}
+                      style={{
+                        textAlign: "center",
+                        color: "#5c6670",
+                        padding: "2rem",
+                      }}
+                    >
+                      No reports found
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  reports.map((report) => (
+                    <tr
+                      key={report.case_id}
+                      style={{ cursor: "pointer" }}
+                      onClick={() => router.push(`/reports/${report.case_id}`)}
+                    >
+                      <td onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selected.has(report.case_id)}
+                          onChange={() => toggleSelect(report.case_id)}
+                        />
+                      </td>
+                      <td
+                        style={{ fontFamily: "monospace", fontSize: ".8rem" }}
+                      >
+                        {report.id.slice(0, 8)}…
+                      </td>
+                      <td>
+                        <span className="admin-badge admin-badge-blue">
+                          {report.report_type}
+                        </span>
+                      </td>
+                      <td
+                        style={{
+                          maxWidth: 180,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {report.reason}
+                      </td>
+                      <td style={{ fontSize: ".8rem" }}>
+                        {report.reporter_id ?? "—"}
+                      </td>
+                      <td
+                        style={{ fontFamily: "monospace", fontSize: ".8rem" }}
+                      >
+                        {report.target_id
+                          ? report.target_id.slice(0, 8) + "…"
+                          : "—"}
+                      </td>
+                      <td>
+                        <span
+                          className={`admin-badge ${severityColor[report.severity] ?? "admin-badge-gray"}`}
+                        >
+                          {report.severity}
+                        </span>
+                      </td>
+                      <td>
+                        <span
+                          className={`admin-badge ${
+                            report.status === "open"
+                              ? "admin-badge-yellow"
+                              : report.status === "in_review"
+                                ? "admin-badge-blue"
+                                : report.status === "actioned"
+                                  ? "admin-badge-green"
+                                  : "admin-badge-gray"
+                          }`}
+                        >
+                          {report.status}
+                        </span>
+                      </td>
+                      <td style={{ fontSize: ".8rem", color: "#5c6670" }}>
+                        {new Date(report.created_at).toLocaleDateString()}
+                      </td>
+                      <td onClick={(e) => e.stopPropagation()}>
+                        <button
+                          className="admin-btn admin-btn-secondary admin-btn-sm"
+                          onClick={() => assignToMe(report.case_id)}
+                        >
+                          Assign to me
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -253,10 +371,32 @@ export default function ReportsPage() {
       )}
 
       {!loading && totalPages > 1 && (
-        <div style={{ display: "flex", gap: ".5rem", alignItems: "center", marginTop: "1rem", justifyContent: "flex-end" }}>
-          <button className="admin-btn admin-btn-secondary admin-btn-sm" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - LIMIT))}>Previous</button>
-          <span style={{ fontSize: ".875rem", color: "#5c6670" }}>Page {currentPage} of {totalPages}</span>
-          <button className="admin-btn admin-btn-secondary admin-btn-sm" disabled={offset + LIMIT >= total} onClick={() => setOffset(offset + LIMIT)}>Next</button>
+        <div
+          style={{
+            display: "flex",
+            gap: ".5rem",
+            alignItems: "center",
+            marginTop: "1rem",
+            justifyContent: "flex-end",
+          }}
+        >
+          <button
+            className="admin-btn admin-btn-secondary admin-btn-sm"
+            disabled={offset === 0}
+            onClick={() => setOffset(Math.max(0, offset - LIMIT))}
+          >
+            Previous
+          </button>
+          <span style={{ fontSize: ".875rem", color: "#5c6670" }}>
+            Page {currentPage} of {totalPages}
+          </span>
+          <button
+            className="admin-btn admin-btn-secondary admin-btn-sm"
+            disabled={offset + LIMIT >= total}
+            onClick={() => setOffset(offset + LIMIT)}
+          >
+            Next
+          </button>
         </div>
       )}
     </div>

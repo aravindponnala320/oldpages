@@ -18,7 +18,10 @@ import {
   radius,
   useToast,
 } from "../../components/ui";
-import type { NotificationResponse, NotificationType } from "@oldpages/shared-types";
+import type {
+  NotificationResponse,
+  NotificationType,
+} from "@oldpages/shared-types";
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -33,7 +36,9 @@ function timeAgo(dateStr: string): string {
 }
 
 function getDateGroup(dateStr: string): string {
-  const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24));
+  const diff = Math.floor(
+    (Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24),
+  );
   if (diff === 0) return "Today";
   if (diff === 1) return "Yesterday";
   if (diff < 7) return "This Week";
@@ -56,11 +61,14 @@ function notifIcon(type: NotificationType): string {
 
 function notifLink(notif: NotificationResponse): string {
   const { type, related_entity_id, related_entity_type } = notif;
-  if (type === "message" && related_entity_id) return `/inbox/${related_entity_id}`;
+  if (type === "message" && related_entity_id)
+    return `/inbox/${related_entity_id}`;
   if (type === "chat_request") return "/chat-requests";
-  if (type === "chat_accepted" && related_entity_id) return `/inbox/${related_entity_id}`;
+  if (type === "chat_accepted" && related_entity_id)
+    return `/inbox/${related_entity_id}`;
   if (type === "saved_search_match") return "/search";
-  if (related_entity_type === "listing" && related_entity_id) return `/listings/${related_entity_id}`;
+  if (related_entity_type === "listing" && related_entity_id)
+    return `/listings/${related_entity_id}`;
   return "#";
 }
 
@@ -69,7 +77,9 @@ export default function NotificationsPage() {
   const router = useRouter();
   const { toast } = useToast();
 
-  const [notifications, setNotifications] = useState<NotificationResponse[]>([]);
+  const [notifications, setNotifications] = useState<NotificationResponse[]>(
+    [],
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
@@ -94,7 +104,9 @@ export default function NotificationsPage() {
     if (!token) return;
     setMarkingAll(true);
     const unread = notifications.filter((n) => n.status === "unread");
-    await Promise.allSettled(unread.map((n) => apiClient.markNotificationRead(n.id, token)));
+    await Promise.allSettled(
+      unread.map((n) => apiClient.markNotificationRead(n.id, token)),
+    );
     setNotifications((prev) =>
       prev.map((n) => (n.status === "unread" ? { ...n, status: "read" } : n)),
     );
@@ -115,7 +127,14 @@ export default function NotificationsPage() {
 
   if (isLoading || loading) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: "60vh",
+        }}
+      >
         <Spinner size="lg" />
       </div>
     );
@@ -135,10 +154,17 @@ export default function NotificationsPage() {
         <PageHeader
           eyebrow="Inbox"
           title="Notifications"
-          subtitle={unreadCount > 0 ? `${unreadCount} unread` : "You're all caught up."}
+          subtitle={
+            unreadCount > 0 ? `${unreadCount} unread` : "You're all caught up."
+          }
           actions={
             unreadCount > 0 && (
-              <Button variant="secondary" size="sm" loading={markingAll} onClick={handleMarkAllRead}>
+              <Button
+                variant="secondary"
+                size="sm"
+                loading={markingAll}
+                onClick={handleMarkAllRead}
+              >
                 Mark all read
               </Button>
             )
@@ -186,7 +212,9 @@ export default function NotificationsPage() {
                   >
                     {group}
                   </h2>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <div
+                    style={{ display: "flex", flexDirection: "column", gap: 6 }}
+                  >
                     {items.map((notif) => {
                       const href = notifLink(notif);
                       const isUnread = notif.status === "unread";
@@ -197,9 +225,13 @@ export default function NotificationsPage() {
                           onClick={() => handleClick(notif)}
                           style={{
                             textDecoration: "none",
-                            background: isUnread ? colors.primarySoft : colors.surface,
+                            background: isUnread
+                              ? colors.primarySoft
+                              : colors.surface,
                             border: `1px solid ${colors.border}`,
-                            borderLeft: isUnread ? `3px solid ${colors.primary}` : `1px solid ${colors.border}`,
+                            borderLeft: isUnread
+                              ? `3px solid ${colors.primary}`
+                              : `1px solid ${colors.border}`,
                             borderRadius: radius.lg,
                             padding: 14,
                             display: "flex",
@@ -207,19 +239,66 @@ export default function NotificationsPage() {
                             alignItems: "flex-start",
                           }}
                         >
-                          <span style={{ fontSize: 22, flexShrink: 0, lineHeight: 1 }}>{notifIcon(notif.type)}</span>
+                          <span
+                            style={{
+                              fontSize: 22,
+                              flexShrink: 0,
+                              lineHeight: 1,
+                            }}
+                          >
+                            {notifIcon(notif.type)}
+                          </span>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <p style={{ margin: 0, fontWeight: isUnread ? font.weight.bold : font.weight.medium, fontSize: font.size.base, color: colors.text }}>
+                            <p
+                              style={{
+                                margin: 0,
+                                fontWeight: isUnread
+                                  ? font.weight.bold
+                                  : font.weight.medium,
+                                fontSize: font.size.base,
+                                color: colors.text,
+                              }}
+                            >
                               {notif.title}
                             </p>
-                            <p style={{ margin: "2px 0 0", fontSize: font.size.sm, color: colors.textSubtle, lineHeight: 1.5 }}>
+                            <p
+                              style={{
+                                margin: "2px 0 0",
+                                fontSize: font.size.sm,
+                                color: colors.textSubtle,
+                                lineHeight: 1.5,
+                              }}
+                            >
                               {notif.body}
                             </p>
                           </div>
-                          <div style={{ flexShrink: 0, textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-                            <span style={{ color: colors.textFaint, fontSize: font.size.xs }}>{timeAgo(notif.created_at)}</span>
+                          <div
+                            style={{
+                              flexShrink: 0,
+                              textAlign: "right",
+                              display: "flex",
+                              flexDirection: "column",
+                              alignItems: "flex-end",
+                              gap: 4,
+                            }}
+                          >
+                            <span
+                              style={{
+                                color: colors.textFaint,
+                                fontSize: font.size.xs,
+                              }}
+                            >
+                              {timeAgo(notif.created_at)}
+                            </span>
                             {isUnread && (
-                              <span style={{ width: 8, height: 8, borderRadius: "50%", background: colors.primary }} />
+                              <span
+                                style={{
+                                  width: 8,
+                                  height: 8,
+                                  borderRadius: "50%",
+                                  background: colors.primary,
+                                }}
+                              />
                             )}
                           </div>
                         </Link>

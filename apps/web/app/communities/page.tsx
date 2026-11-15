@@ -23,7 +23,10 @@ import {
   shadow,
   useToast,
 } from "../../components/ui";
-import type { CommunitySummaryResponse, CommunityType } from "@oldpages/shared-types";
+import type {
+  CommunitySummaryResponse,
+  CommunityType,
+} from "@oldpages/shared-types";
 
 type Tab = "discover" | "mine";
 
@@ -77,10 +80,35 @@ function CommunityCard({
       >
         {icon}
       </div>
-      <div style={{ padding: 16, display: "flex", flexDirection: "column", flex: 1 }}>
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
-          <Link href={`/communities/${community.id}`} style={{ textDecoration: "none" }}>
-            <h3 style={{ margin: 0, fontSize: font.size.md, fontWeight: font.weight.bold, color: colors.text }}>
+      <div
+        style={{
+          padding: 16,
+          display: "flex",
+          flexDirection: "column",
+          flex: 1,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            gap: 8,
+            marginBottom: 6,
+          }}
+        >
+          <Link
+            href={`/communities/${community.id}`}
+            style={{ textDecoration: "none" }}
+          >
+            <h3
+              style={{
+                margin: 0,
+                fontSize: font.size.md,
+                fontWeight: font.weight.bold,
+                color: colors.text,
+              }}
+            >
               {community.name}
             </h3>
           </Link>
@@ -88,37 +116,75 @@ function CommunityCard({
         </div>
         {community.description && (
           <p
-            style={{
-              margin: "0 0 10px",
-              fontSize: font.size.sm,
-              color: colors.textSubtle,
-              lineHeight: font.lineHeight.snug,
-              display: "-webkit-box",
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
-            } as React.CSSProperties}
+            style={
+              {
+                margin: "0 0 10px",
+                fontSize: font.size.sm,
+                color: colors.textSubtle,
+                lineHeight: font.lineHeight.snug,
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              } as React.CSSProperties
+            }
           >
             {community.description}
           </p>
         )}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 12,
+            flexWrap: "wrap",
+          }}
+        >
           <span style={{ fontSize: font.size.xs, color: colors.textFaint }}>
             {community.member_count.toLocaleString()} members
           </span>
-          {community.city && <span style={{ fontSize: font.size.xs, color: colors.textFaint }}>· {community.city}</span>}
-          {community.genre && <span style={{ fontSize: font.size.xs, color: colors.textFaint }}>· {community.genre}</span>}
+          {community.city && (
+            <span style={{ fontSize: font.size.xs, color: colors.textFaint }}>
+              · {community.city}
+            </span>
+          )}
+          {community.genre && (
+            <span style={{ fontSize: font.size.xs, color: colors.textFaint }}>
+              · {community.genre}
+            </span>
+          )}
         </div>
         <div style={{ display: "flex", gap: 8, marginTop: "auto" }}>
-          <LinkButton href={`/communities/${community.id}`} variant="secondary" size="sm">Visit</LinkButton>
+          <LinkButton
+            href={`/communities/${community.id}`}
+            variant="secondary"
+            size="sm"
+          >
+            Visit
+          </LinkButton>
           {isMember ? (
             onLeave ? (
-              <Button variant="ghost" size="sm" loading={joining} onClick={() => onLeave(community.id)}>Leave</Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                loading={joining}
+                onClick={() => onLeave(community.id)}
+              >
+                Leave
+              </Button>
             ) : (
               <Badge variant="success" label="Member" />
             )
           ) : (
-            <Button variant="primary" size="sm" loading={joining} onClick={() => onJoin(community.id)}>Join</Button>
+            <Button
+              variant="primary"
+              size="sm"
+              loading={joining}
+              onClick={() => onJoin(community.id)}
+            >
+              Join
+            </Button>
           )}
         </div>
       </div>
@@ -131,7 +197,9 @@ export default function CommunitiesPage() {
   const router = useRouter();
   const { toast } = useToast();
 
-  const [communities, setCommunities] = useState<CommunitySummaryResponse[]>([]);
+  const [communities, setCommunities] = useState<CommunitySummaryResponse[]>(
+    [],
+  );
   const [mine, setMine] = useState<CommunitySummaryResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("discover");
@@ -149,7 +217,11 @@ export default function CommunitiesPage() {
     if (!token) return;
     apiClient
       .listCommunities({}, token)
-      .then((res) => setMine(res.items.filter((c) => c.viewer_membership_status === "active")))
+      .then((res) =>
+        setMine(
+          res.items.filter((c) => c.viewer_membership_status === "active"),
+        ),
+      )
       .catch(() => {});
   }, [isAuthenticated]);
 
@@ -157,7 +229,10 @@ export default function CommunitiesPage() {
     setLoading(true);
     const token = getAccessToken() ?? undefined;
     try {
-      const res = await apiClient.listCommunities({ city: cityFilter || null, genre: null }, token);
+      const res = await apiClient.listCommunities(
+        { city: cityFilter || null, genre: null },
+        token,
+      );
       setCommunities(res.items);
     } catch {
       toast("Failed to load communities", "error");
@@ -167,7 +242,10 @@ export default function CommunitiesPage() {
   }
 
   const handleJoin = async (communityId: string) => {
-    if (!isAuthenticated) { router.push("/"); return; }
+    if (!isAuthenticated) {
+      router.push("/");
+      return;
+    }
     const token = getAccessToken();
     if (!token) return;
     setJoining(communityId);
@@ -176,7 +254,11 @@ export default function CommunitiesPage() {
       setCommunities((prev) =>
         prev.map((c) =>
           c.id === communityId
-            ? { ...c, viewer_membership_status: "active" as const, member_count: c.member_count + 1 }
+            ? {
+                ...c,
+                viewer_membership_status: "active" as const,
+                member_count: c.member_count + 1,
+              }
             : c,
         ),
       );
@@ -205,7 +287,14 @@ export default function CommunitiesPage() {
           subtitle="Connect with readers in your city and join book clubs, swap groups, and more."
         />
 
-        <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: 12,
+            marginBottom: 20,
+            flexWrap: "wrap",
+          }}
+        >
           <Input
             containerStyle={{ flex: 1, minWidth: 220 }}
             placeholder="Search communities..."
@@ -220,7 +309,9 @@ export default function CommunitiesPage() {
             onChange={(e) => setCityFilter(e.target.value)}
             onBlur={() => loadCommunities()}
           />
-          <Button variant="secondary" onClick={loadCommunities}>Apply</Button>
+          <Button variant="secondary" onClick={loadCommunities}>
+            Apply
+          </Button>
         </div>
 
         <div style={{ marginBottom: 20 }}>
@@ -235,7 +326,9 @@ export default function CommunitiesPage() {
         </div>
 
         {loading && (
-          <div style={{ display: "flex", justifyContent: "center", padding: 40 }}>
+          <div
+            style={{ display: "flex", justifyContent: "center", padding: 40 }}
+          >
             <Spinner size="md" />
           </div>
         )}
@@ -243,7 +336,11 @@ export default function CommunitiesPage() {
         {!loading && displayed.length === 0 && (
           <EmptyState
             icon={<Icon.user size={26} color={colors.primary} />}
-            title={tab === "mine" ? "No communities joined yet" : "No communities found"}
+            title={
+              tab === "mine"
+                ? "No communities joined yet"
+                : "No communities found"
+            }
             description={
               tab === "mine"
                 ? "Discover and join communities to get started."
@@ -252,7 +349,15 @@ export default function CommunitiesPage() {
           />
         )}
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16, alignItems: "start" }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns:
+              "repeat(auto-fill, minmax(min(100%, 280px), 1fr))",
+            gap: 16,
+            alignItems: "start",
+          }}
+        >
           {displayed.map((community) => (
             <CommunityCard
               key={community.id}

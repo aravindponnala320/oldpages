@@ -29,7 +29,11 @@ from oldpages_api.catalog.models import (
     Category,
     Publisher,
 )
-from oldpages_api.catalog.permissions import require_catalog_manager
+from oldpages_api.catalog.permissions import (
+    CATALOG_EDITOR_ROLES,
+    require_catalog_editor,
+    require_catalog_manager,
+)
 from oldpages_api.catalog.repository import CatalogRepository
 from oldpages_api.catalog.schemas import (
     AcademicMetadataInput,
@@ -45,7 +49,10 @@ from oldpages_api.catalog.schemas import (
     BookListResponse,
     BookResponse,
     BookUpdateRequest,
+    CategoryLevel,
+    CategoryLevelsResponse,
     CategoryNode,
+    CategoryOption,
     CategorySummary,
     CategoryTreeResponse,
     IdentifierType,
@@ -237,7 +244,9 @@ class CatalogService:
         actor: User,
         context: AuthenticatedRequestContext,
     ) -> BookResponse:
-        require_catalog_manager(actor)
+        require_catalog_editor(
+            actor, await self.repo.user_has_any_role(actor.id, CATALOG_EDITOR_ROLES)
+        )
         edition = await self.repo.get_edition_by_public_id(book_id)
         if edition is None:
             raise CatalogEntryNotFoundError()
@@ -349,9 +358,41 @@ class CatalogService:
             raise CatalogEntryNotFoundError()
         return self.book_response(reloaded)
 
-    async def list_categories(self) -> CategoryTreeResponse:
+    async def list_categories(self, max_depth: int | None = None) -> CategoryTreeResponse:
         categories = await self.repo.list_categories()
-        return CategoryTreeResponse(items=category_tree(categories))
+        return CategoryTreeResponse(items=category_tree(categories, max_depth))
+
+    async def category_levels(self, slug: str | None) -> CategoryLevelsResponse:
+        categories = await self.repo.list_categories()
+        by_id = {c.id: c for c in categories}
+        by_slug = {c.slug: c for c in categories}
+        children: dict[int | None, list[Category]] = {}
+        for category in categories:  # already in sort order
+            parent = category.parent_id if category.parent_id in by_id else None
+            children.setdefault(parent, []).append(category)
+
+        path: list[Category] = []
+        node = by_slug.get(slug) if slug else None
+        if slug and node is None:
+            raise CategoryNotFoundError()
+        while node is not None:
+            path.insert(0, node)
+            node = by_id.get(node.parent_id) if node.parent_id is not None else None
+
+        def option(c: Category) -> CategoryOption:
+            return CategoryOption(has_children=c.id in children, name=c.name, slug=c.slug)
+
+        levels = [CategoryLevel(label="Category", options=[option(c) for c in children[None]])]
+        for chosen in path:
+            if chosen.id in children:
+                levels.append(
+                    CategoryLevel(
+                        label=chosen.child_label or "Subcategory",
+                        options=[option(c) for c in children[chosen.id]],
+                        parent_slug=chosen.slug,
+                    )
+                )
+        return CategoryLevelsResponse(levels=levels, path=[option(c) for c in path])
 
     async def list_authors(
         self,
@@ -659,9 +700,10 @@ def publisher_summary(publisher: Publisher | None) -> PublisherSummary | None:
     )
 
 
-def category_tree(categories: list[Category]) -> list[CategoryNode]:
+def category_tree(categories: list[Category], max_depth: int | None = None) -> list[CategoryNode]:
     nodes = {
         category.id: CategoryNode(
+            child_label=category.child_label,
             id=category.public_id,
             name=category.name,
             parent_id=None,
@@ -669,8 +711,19 @@ def category_tree(categories: list[Category]) -> list[CategoryNode]:
         )
         for category in categories
     }
+    by_id = {category.id: category for category in categories}
+
+    def depth(category: Category) -> int:
+        d = 0
+        while category.parent_id in by_id:
+            category = by_id[category.parent_id]
+            d += 1
+        return d
+
     roots: list[CategoryNode] = []
     for category in categories:
+        if max_depth is not None and depth(category) >= max_depth:
+            continue
         node = nodes[category.id]
         if category.parent_id is None or category.parent_id not in nodes:
             roots.append(node)

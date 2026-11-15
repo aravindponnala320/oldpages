@@ -39,9 +39,26 @@ export function EmptyState({ icon, title, description, action }: Props) {
           {icon}
         </div>
       )}
-      <h3 style={{ margin: 0, fontSize: font.size.lg, fontWeight: font.weight.bold, color: colors.text }}>{title}</h3>
+      <h3
+        style={{
+          margin: 0,
+          fontSize: font.size.lg,
+          fontWeight: font.weight.bold,
+          color: colors.text,
+        }}
+      >
+        {title}
+      </h3>
       {description && (
-        <p style={{ margin: 0, fontSize: font.size.base, color: colors.textSubtle, maxWidth: 420, lineHeight: font.lineHeight.snug }}>
+        <p
+          style={{
+            margin: 0,
+            fontSize: font.size.base,
+            color: colors.textSubtle,
+            maxWidth: 420,
+            lineHeight: font.lineHeight.snug,
+          }}
+        >
           {description}
         </p>
       )}

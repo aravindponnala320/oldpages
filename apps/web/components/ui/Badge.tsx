@@ -23,14 +23,14 @@ type Props = {
 };
 
 const styles: Record<Variant, { bg: string; color: string }> = {
-  default: { bg: colors.divider,      color: colors.textMuted },
-  brand:   { bg: colors.primarySoft,  color: colors.primaryStrong },
-  success: { bg: colors.successSoft,  color: colors.successText },
-  warning: { bg: colors.warningSoft,  color: colors.warningText },
-  danger:  { bg: colors.dangerSoft,   color: colors.dangerText },
-  error:   { bg: colors.dangerSoft,   color: colors.dangerText },
-  info:    { bg: colors.infoSoft,     color: colors.infoText },
-  purple:  { bg: "#ede9fe",           color: "#5b21b6" },
+  default: { bg: colors.divider, color: colors.textMuted },
+  brand: { bg: colors.primarySoft, color: colors.primaryStrong },
+  success: { bg: colors.successSoft, color: colors.successText },
+  warning: { bg: colors.warningSoft, color: colors.warningText },
+  danger: { bg: colors.dangerSoft, color: colors.dangerText },
+  error: { bg: colors.dangerSoft, color: colors.dangerText },
+  info: { bg: colors.infoSoft, color: colors.infoText },
+  purple: { bg: "#ede9fe", color: "#5b21b6" },
   neutral: { bg: colors.surfaceMuted, color: colors.textSubtle },
 };
 
@@ -39,7 +39,13 @@ const sizes: Record<Size, CSSProperties> = {
   md: { fontSize: font.size.sm, padding: "4px 10px" },
 };
 
-export function Badge({ children, label, variant = "default", size = "sm", style }: Props) {
+export function Badge({
+  children,
+  label,
+  variant = "default",
+  size = "sm",
+  style,
+}: Props) {
   const s = styles[variant];
   return (
     <span
@@ -62,17 +68,26 @@ export function Badge({ children, label, variant = "default", size = "sm", style
 }
 
 /** Maps a raw listing.condition string to a Badge. */
-export function ConditionBadge({ condition, size = "sm" }: { condition: string | null | undefined; size?: Size }) {
+export function ConditionBadge({
+  condition,
+  size = "sm",
+}: {
+  condition: string | null | undefined;
+  size?: Size;
+}) {
   if (!condition) return null;
   const map: Record<string, { label: string; variant: Variant }> = {
-    new_sealed: { label: "New",        variant: "success" },
-    like_new:   { label: "Like New",   variant: "info" },
-    excellent:  { label: "Excellent",  variant: "purple" },
-    very_good:  { label: "Very Good",  variant: "brand" },
-    good:       { label: "Good",       variant: "success" },
+    new_sealed: { label: "New", variant: "success" },
+    like_new: { label: "Like New", variant: "info" },
+    excellent: { label: "Excellent", variant: "purple" },
+    very_good: { label: "Very Good", variant: "brand" },
+    good: { label: "Good", variant: "success" },
     acceptable: { label: "Acceptable", variant: "warning" },
-    poor:       { label: "Poor",       variant: "danger" },
+    poor: { label: "Poor", variant: "danger" },
   };
-  const cfg = map[condition] ?? { label: condition, variant: "neutral" as Variant };
+  const cfg = map[condition] ?? {
+    label: condition,
+    variant: "neutral" as Variant,
+  };
   return <Badge label={cfg.label} variant={cfg.variant} size={size} />;
 }

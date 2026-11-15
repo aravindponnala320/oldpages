@@ -84,8 +84,9 @@ class Order(TimestampMixin, PublicIdMixin, Base):
         CheckConstraint("total_cents >= 0", name="total_non_negative"),
         Index("ix_orders_buyer_status", "buyer_user_id", "status"),
         Index("ix_orders_seller_status", "seller_user_id", "status"),
-        Index("ix_orders_cart_id", "cart_id"),
-        Index("ix_orders_offer_id", "offer_id"),
+        # One order per cart and per accepted offer, so retries can't charge twice.
+        UniqueConstraint("cart_id", name="uq_orders_cart_id"),
+        UniqueConstraint("offer_id", name="uq_orders_offer_id"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

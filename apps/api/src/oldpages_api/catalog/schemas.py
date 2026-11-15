@@ -252,6 +252,7 @@ class ResolveIsbnResponse(BaseModel):
 
 
 class CategoryNode(BaseModel):
+    child_label: str | None = None
     children: list[CategoryNode] = Field(default_factory=list)
     id: str
     name: str
@@ -261,6 +262,27 @@ class CategoryNode(BaseModel):
 
 class CategoryTreeResponse(BaseModel):
     items: list[CategoryNode]
+
+
+class CategoryOption(BaseModel):
+    has_children: bool
+    name: str
+    slug: str
+
+
+class CategoryLevel(BaseModel):
+    """One dropdown: the children of `parent_slug` (top-level categories when None)."""
+
+    label: str
+    options: list[CategoryOption]
+    parent_slug: str | None = None
+
+
+class CategoryLevelsResponse(BaseModel):
+    """Everything to draw the cascading dropdowns for one chosen category."""
+
+    levels: list[CategoryLevel]
+    path: list[CategoryOption]  # the chosen category and its ancestors, root first
 
 
 class AuthorListResponse(BaseModel):

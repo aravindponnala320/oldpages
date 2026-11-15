@@ -149,8 +149,12 @@ class Transaction(TimestampMixin, PublicIdMixin, Base):
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    buyer_marked_received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    seller_marked_delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    buyer_marked_received_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    seller_marked_delivered_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     metadata_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
 
     buyer: Mapped[User] = relationship(foreign_keys=[buyer_user_id])

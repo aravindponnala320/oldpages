@@ -15,6 +15,8 @@ import type {
   BuddyReadCreateRequest,
   BuddyReadProgressRequest,
   BuddyReadResponse,
+  CategoryLevelsResponse,
+  RequestAcceptedResponse,
   CategoryTreeResponse,
   ChatRequestActionRequest,
   ChatRequestCreateRequest,
@@ -136,6 +138,7 @@ import {
   bookResponseSchema,
   bookVoteResponseSchema,
   buddyReadResponseSchema,
+  categoryLevelsResponseSchema,
   categoryTreeResponseSchema,
   chatRequestResponseSchema,
   clubBookListResponseSchema,
@@ -210,6 +213,8 @@ export type ApiClientOptions = {
 export type LocationPayload = {
   latitude: number;
   longitude: number;
+  /** Area inside the city: "Gachibowli", "Andheri West". */
+  locality?: string | null;
   city?: string | null;
   state?: string | null;
   country?: string | null;
@@ -242,6 +247,7 @@ export type GeoSearchItem = {
   display_name: string;
   latitude: number;
   longitude: number;
+  locality?: string | null;
   city?: string | null;
   state?: string | null;
   country?: string | null;
@@ -332,11 +338,28 @@ export class OldPagesApiClient {
     return authResponseSchema.parse(response);
   }
 
-  async forgotPassword(email: string): Promise<void> {
-    await this.request<unknown>("/api/v1/auth/forgot-password", {
-      body: JSON.stringify({ email }),
+  async logout(refreshToken: string): Promise<void> {
+    await this.request<unknown>("/api/v1/auth/logout", {
+      body: JSON.stringify({ refresh_token: refreshToken }),
       method: "POST",
     });
+  }
+
+  async logoutAll(accessToken: string): Promise<void> {
+    await this.request<unknown>("/api/v1/auth/logout-all", {
+      accessToken,
+      method: "POST",
+    });
+  }
+
+  async forgotPassword(email: string): Promise<RequestAcceptedResponse> {
+    return this.request<RequestAcceptedResponse>(
+      "/api/v1/auth/forgot-password",
+      {
+        body: JSON.stringify({ email }),
+        method: "POST",
+      },
+    );
   }
 
   async resetPassword(token: string, newPassword: string): Promise<void> {
@@ -440,6 +463,18 @@ export class OldPagesApiClient {
     return categoryTreeResponseSchema.parse(response) as CategoryTreeResponse;
   }
 
+  /** The cascading category dropdowns for `slug` (just the top level when omitted). */
+  async getCategoryLevels(
+    slug?: string | null,
+  ): Promise<CategoryLevelsResponse> {
+    const response = await this.request<unknown>(
+      `/api/v1/categories/levels${queryString({ slug })}`,
+    );
+    return categoryLevelsResponseSchema.parse(
+      response,
+    ) as CategoryLevelsResponse;
+  }
+
   async listAuthors(
     params: {
       cursor?: string | null;
@@ -508,9 +543,14 @@ export class OldPagesApiClient {
     return listingResponseSchema.parse(response) as ListingResponse;
   }
 
-  async getListing(listingId: string): Promise<ListingResponse> {
+  /** Drafts and non-public listings are only returned to their seller, so pass a token for those. */
+  async getListing(
+    listingId: string,
+    accessToken?: string,
+  ): Promise<ListingResponse> {
     const response = await this.request<unknown>(
       `/api/v1/listings/${encodeURIComponent(listingId)}`,
+      { accessToken },
     );
     return listingResponseSchema.parse(response) as ListingResponse;
   }
@@ -1751,13 +1791,21 @@ export class OldPagesApiClient {
 
   async listTransactions(
     accessToken: string,
-    params: { role?: "buyer" | "seller"; status?: string; limit?: number; cursor?: string } = {},
+    params: {
+      role?: "buyer" | "seller";
+      status?: string;
+      limit?: number;
+      cursor?: string;
+    } = {},
   ): Promise<{ items: TransactionResponse[]; next_cursor: string | null }> {
     const response = await this.request<unknown>(
       `/api/v1/orders${queryString({ ...params })}`,
       { accessToken },
     );
-    return response as { items: TransactionResponse[]; next_cursor: string | null };
+    return response as {
+      items: TransactionResponse[];
+      next_cursor: string | null;
+    };
   }
 
   async getTransaction(
@@ -1783,7 +1831,9 @@ export class OldPagesApiClient {
   }
 
   async detectLocation(): Promise<DetectLocationResponse> {
-    return (await this.request<unknown>("/api/v1/geo/detect")) as DetectLocationResponse;
+    return (await this.request<unknown>(
+      "/api/v1/geo/detect",
+    )) as DetectLocationResponse;
   }
 
   async searchPlaces(
@@ -1819,7 +1869,9 @@ export class OldPagesApiClient {
   ): Promise<ActiveLocationResponse> {
     return (await this.request<unknown>("/api/v1/me/location", {
       accessToken,
-      headers: location ? { "X-User-Location": encodeLocationHeader(location) } : undefined,
+      headers: location
+        ? { "X-User-Location": encodeLocationHeader(location) }
+        : undefined,
     })) as ActiveLocationResponse;
   }
 

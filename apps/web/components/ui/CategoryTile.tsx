@@ -36,7 +36,15 @@ export function CategoryTile({ name, href, color, icon }: Props) {
       >
         {icon}
       </div>
-      <span style={{ fontSize: font.size.base, fontWeight: font.weight.medium, color: colors.textMuted }}>{name}</span>
+      <span
+        style={{
+          fontSize: font.size.base,
+          fontWeight: font.weight.medium,
+          color: colors.textMuted,
+        }}
+      >
+        {name}
+      </span>
     </Link>
   );
 }

@@ -20,11 +20,23 @@ type CommonProps = {
 function stylesFor(variant: Variant): CSSProperties {
   switch (variant) {
     case "solid":
-      return { background: colors.primary, color: colors.textInverse, border: "1px solid transparent" };
+      return {
+        background: colors.primary,
+        color: colors.textInverse,
+        border: "1px solid transparent",
+      };
     case "outline":
-      return { background: colors.surface, color: colors.textMuted, border: `1px solid ${colors.borderStrong}` };
+      return {
+        background: colors.surface,
+        color: colors.textMuted,
+        border: `1px solid ${colors.borderStrong}`,
+      };
     default:
-      return { background: "transparent", color: colors.textMuted, border: "1px solid transparent" };
+      return {
+        background: "transparent",
+        color: colors.textMuted,
+        border: "1px solid transparent",
+      };
   }
 }
 

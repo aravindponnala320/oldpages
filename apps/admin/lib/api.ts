@@ -1,8 +1,16 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+import { getPublicConfig } from "@oldpages/config";
 
-export async function adminFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const token = typeof window !== "undefined" ? localStorage.getItem("op_access_token") : null;
-  const res = await fetch(`${API_BASE}/api/v1${path}`, {
+export const apiBaseUrl = getPublicConfig().apiBaseUrl.replace(/\/+$/, "");
+
+export async function adminFetch<T>(
+  path: string,
+  options?: RequestInit,
+): Promise<T> {
+  const token =
+    typeof window !== "undefined"
+      ? localStorage.getItem("op_access_token")
+      : null;
+  const res = await fetch(`${apiBaseUrl}/api/v1${path}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",

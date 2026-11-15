@@ -51,6 +51,14 @@ class ListingRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_book_edition_by_fingerprint(self, fingerprint: str) -> BookEdition | None:
+        result = await self.session.execute(
+            select(BookEdition)
+            .options(selectinload(BookEdition.identifiers))
+            .where(BookEdition.edition_fingerprint == fingerprint)
+        )
+        return result.scalar_one_or_none()
+
     async def get_book_edition_by_isbn(
         self, identifier_type: str, value: str
     ) -> BookEdition | None:

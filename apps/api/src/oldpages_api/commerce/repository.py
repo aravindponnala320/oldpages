@@ -16,7 +16,7 @@ from oldpages_api.commerce.models import (
     ReviewDimension,
     Transaction,
 )
-from oldpages_api.identity.models import User, UserProfile
+from oldpages_api.identity.models import User
 from oldpages_api.listings.models import (
     Listing,
     ListingInventory,
@@ -165,6 +165,9 @@ class CommerceRepository:
 
     async def flush(self) -> None:
         await self.session.flush()
+
+    async def rollback(self) -> None:
+        await self.session.rollback()
 
     async def commit(self) -> None:
         await self.session.commit()

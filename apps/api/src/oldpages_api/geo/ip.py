@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 @lru_cache(maxsize=1)
 def _reader(mmdb_path: str) -> Any | None:
     try:
-        import geoip2.database  # type: ignore[import-not-found]
+        import geoip2.database
     except ImportError:
         logger.info("geoip2 not installed; IP geolocation disabled")
         return None
@@ -37,7 +37,7 @@ def _is_public_ip(ip: str) -> bool:
 
 def extract_client_ip(headers: dict[str, str] | Any, fallback: str | None) -> str | None:
     """Prefer the first public IP from X-Forwarded-For, else the direct client IP."""
-    getter = headers.get if hasattr(headers, "get") else (lambda k: headers.get(k))  # type: ignore[union-attr]
+    getter = headers.get if hasattr(headers, "get") else (lambda k: headers.get(k))
     xff = getter("x-forwarded-for") or getter("X-Forwarded-For")
     if xff:
         for candidate in (piece.strip() for piece in xff.split(",")):

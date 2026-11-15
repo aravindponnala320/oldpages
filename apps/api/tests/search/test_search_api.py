@@ -106,6 +106,42 @@ async def test_nearest_sort_uses_public_coordinates_and_hides_exact_location(
 
 
 @pytest.mark.asyncio
+async def test_search_can_hide_the_readers_own_listings(
+    client: AsyncClient,
+    register_user: RegisterUser,
+) -> None:
+    me = await register_user(client)
+    other = await register_user(
+        client, email="other@example.com", display_name="Other", username="other"
+    )
+    mine_book = await create_book(client, me["tokens"]["access_token"], title="My Copy")
+    their_book = await create_book(client, other["tokens"]["access_token"], title="Their Copy")
+    mine = await create_published_listing(
+        client, me["tokens"]["access_token"], mine_book["id"], city="Pune"
+    )
+    theirs = await create_published_listing(
+        client, other["tokens"]["access_token"], their_book["id"], city="Pune"
+    )
+
+    everyone = await client.get("/api/v1/search/listings")
+    others_only = await client.get(
+        "/api/v1/search/listings", params={"exclude_seller_id": me["user"]["id"]}
+    )
+    unknown_seller = await client.get(
+        "/api/v1/search/listings", params={"exclude_seller_id": "nobody"}
+    )
+
+    assert {item["id"] for item in everyone.json()["items"]} == {mine["id"], theirs["id"]}
+    assert [item["id"] for item in others_only.json()["items"]] == [theirs["id"]]
+    assert unknown_seller.json()["result_count"] == 2
+
+    shelf = await client.get("/api/v1/search/listings", params={"seller_id": me["user"]["id"]})
+    nobody = await client.get("/api/v1/search/listings", params={"seller_id": "nobody"})
+    assert [item["id"] for item in shelf.json()["items"]] == [mine["id"]]
+    assert nobody.json()["result_count"] == 0
+
+
+@pytest.mark.asyncio
 async def test_zero_result_searches_are_recorded(
     client: AsyncClient,
     register_user: RegisterUser,
@@ -290,6 +326,7 @@ async def create_published_listing(
     exact_latitude: str = "18.520430",
     exact_longitude: str = "73.856744",
     public_area: str = "Deccan, Pune",
+    category: str | None = None,
 ) -> dict[str, Any]:
     media = await upload_media(client, token)
     response = await client.post(
@@ -297,6 +334,7 @@ async def create_published_listing(
         headers=auth(token),
         json={
             "book_id": book_id,
+            "category": category,
             "condition": {
                 "condition": "good",
                 "damage_details": "Light shelf wear.",

@@ -11,9 +11,8 @@ from oldpages_api.identity.security import hash_password, utc_now
 from oldpages_api.shared.db.database import get_session_factory
 from oldpages_api.shared.db.ids import new_ulid
 
-
-
-# docker compose exec api python -m oldpages_api.scripts.create_superuser --email admin@oldpages.in --display-name Admin --username admin --password Admin1234!
+# docker compose exec api python -m oldpages_api.scripts.create_superuser \
+#   --email admin@oldpages.in --display-name Admin --username admin --password '<choose one>'
 
 
 async def run(email: str, password: str, display_name: str, username: str) -> None:

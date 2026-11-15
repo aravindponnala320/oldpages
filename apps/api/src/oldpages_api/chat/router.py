@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Request, WebSocket, status
@@ -28,6 +29,8 @@ from oldpages_api.identity.exceptions import InvalidTokenError
 from oldpages_api.identity.models import User
 from oldpages_api.identity.service import IdentityService
 from oldpages_api.shared.db.database import get_session
+
+logger = logging.getLogger(__name__)
 
 chat_requests_router = APIRouter(prefix="/chat-requests", tags=["chat requests"])
 conversations_router = APIRouter(prefix="/conversations", tags=["conversations"])
@@ -211,13 +214,15 @@ async def conversations_websocket(
     replay = await service.websocket_replay(actor, last_message_id)
     await websocket.send_json({"type": "connected", "user_id": actor.public_id})
     for message in replay:
-        await websocket.send_json({"type": "message.created", "message": message.model_dump(mode="json")})
+        await websocket.send_json(
+            {"type": "message.created", "message": message.model_dump(mode="json")}
+        )
 
     # Get all conversation IDs this user participates in
-    conv_list = await service.list_conversations(actor)
-    conv_ids = [c.id for c in conv_list.items]
+    conv_ids = await service.conversation_ids(actor)
 
     from oldpages_api.shared.cache.redis import get_redis
+
     redis = get_redis()
     pubsub = redis.pubsub()
 
@@ -252,7 +257,7 @@ async def conversations_websocket(
     try:
         await asyncio.gather(redis_listener(), ws_receiver())
     except Exception:
-        pass
+        logger.debug("websocket closed", exc_info=True)
     finally:
         await pubsub.unsubscribe()
         await pubsub.aclose()

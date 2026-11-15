@@ -37,7 +37,9 @@ export default function CommunitiesPage() {
     setLoading(false);
   }
 
-  useEffect(() => { fetchCommunities(); }, [offset]);
+  useEffect(() => {
+    fetchCommunities();
+  }, [offset]);
 
   async function handleAction() {
     if (!actionModal) return;
@@ -54,13 +56,30 @@ export default function CommunitiesPage() {
     <div>
       <div className="admin-page-header">
         <h1 className="admin-page-title">Communities</h1>
-        <span style={{ fontSize: ".875rem", color: "#5c6670" }}>{total} total</span>
+        <span style={{ fontSize: ".875rem", color: "#5c6670" }}>
+          {total} total
+        </span>
       </div>
 
-      {loading && <div style={{ display: "flex", justifyContent: "center", padding: "2rem" }}><span className="spinner" /></div>}
+      {loading && (
+        <div
+          style={{ display: "flex", justifyContent: "center", padding: "2rem" }}
+        >
+          <span className="spinner" />
+        </div>
+      )}
 
       {error && (
-        <div style={{ background: "#fee2e2", color: "#991b1b", padding: ".75rem", borderRadius: 6, marginBottom: "1rem", fontSize: ".875rem" }}>
+        <div
+          style={{
+            background: "#fee2e2",
+            color: "#991b1b",
+            padding: ".75rem",
+            borderRadius: 6,
+            marginBottom: "1rem",
+            fontSize: ".875rem",
+          }}
+        >
           {error}
         </div>
       )}
@@ -83,46 +102,90 @@ export default function CommunitiesPage() {
               </thead>
               <tbody>
                 {communities.length === 0 ? (
-                  <tr><td colSpan={8} style={{ textAlign: "center", color: "#5c6670", padding: "2rem" }}>No communities found</td></tr>
-                ) : communities.map((c) => (
-                  <tr key={c.id}>
-                    <td style={{ fontFamily: "monospace", fontSize: ".8rem" }}>{c.id.slice(0, 8)}…</td>
-                    <td style={{ fontWeight: 500 }}>{c.name}</td>
-                    <td style={{ fontSize: ".8rem" }}>{c.community_type ?? "—"}</td>
-                    <td>{c.member_count ?? 0}</td>
-                    <td>
-                      <span className={`admin-badge ${
-                        c.status === "active" ? "admin-badge-green" :
-                        c.status === "suspended" ? "admin-badge-yellow" : "admin-badge-gray"
-                      }`}>{c.status ?? "active"}</span>
-                    </td>
-                    <td>
-                      {(c.reports_count ?? 0) > 0
-                        ? <span className="admin-badge admin-badge-red">{c.reports_count}</span>
-                        : <span style={{ color: "#5c6670" }}>0</span>}
-                    </td>
-                    <td style={{ fontSize: ".8rem", color: "#5c6670" }}>{new Date(c.created_at).toLocaleDateString()}</td>
-                    <td>
-                      <div style={{ display: "flex", gap: ".25rem" }}>
-                        {c.status !== "suspended" ? (
-                          <button
-                            className="admin-btn admin-btn-danger admin-btn-sm"
-                            onClick={() => setActionModal({ communityId: c.id, communityName: c.name, action: "suspend" })}
-                          >
-                            Suspend
-                          </button>
-                        ) : (
-                          <button
-                            className="admin-btn admin-btn-secondary admin-btn-sm"
-                            onClick={() => setActionModal({ communityId: c.id, communityName: c.name, action: "unsuspend" })}
-                          >
-                            Unsuspend
-                          </button>
-                        )}
-                      </div>
+                  <tr>
+                    <td
+                      colSpan={8}
+                      style={{
+                        textAlign: "center",
+                        color: "#5c6670",
+                        padding: "2rem",
+                      }}
+                    >
+                      No communities found
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  communities.map((c) => (
+                    <tr key={c.id}>
+                      <td
+                        style={{ fontFamily: "monospace", fontSize: ".8rem" }}
+                      >
+                        {c.id.slice(0, 8)}…
+                      </td>
+                      <td style={{ fontWeight: 500 }}>{c.name}</td>
+                      <td style={{ fontSize: ".8rem" }}>
+                        {c.community_type ?? "—"}
+                      </td>
+                      <td>{c.member_count ?? 0}</td>
+                      <td>
+                        <span
+                          className={`admin-badge ${
+                            c.status === "active"
+                              ? "admin-badge-green"
+                              : c.status === "suspended"
+                                ? "admin-badge-yellow"
+                                : "admin-badge-gray"
+                          }`}
+                        >
+                          {c.status ?? "active"}
+                        </span>
+                      </td>
+                      <td>
+                        {(c.reports_count ?? 0) > 0 ? (
+                          <span className="admin-badge admin-badge-red">
+                            {c.reports_count}
+                          </span>
+                        ) : (
+                          <span style={{ color: "#5c6670" }}>0</span>
+                        )}
+                      </td>
+                      <td style={{ fontSize: ".8rem", color: "#5c6670" }}>
+                        {new Date(c.created_at).toLocaleDateString()}
+                      </td>
+                      <td>
+                        <div style={{ display: "flex", gap: ".25rem" }}>
+                          {c.status !== "suspended" ? (
+                            <button
+                              className="admin-btn admin-btn-danger admin-btn-sm"
+                              onClick={() =>
+                                setActionModal({
+                                  communityId: c.id,
+                                  communityName: c.name,
+                                  action: "suspend",
+                                })
+                              }
+                            >
+                              Suspend
+                            </button>
+                          ) : (
+                            <button
+                              className="admin-btn admin-btn-secondary admin-btn-sm"
+                              onClick={() =>
+                                setActionModal({
+                                  communityId: c.id,
+                                  communityName: c.name,
+                                  action: "unsuspend",
+                                })
+                              }
+                            >
+                              Unsuspend
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -130,10 +193,32 @@ export default function CommunitiesPage() {
       )}
 
       {!loading && totalPages > 1 && (
-        <div style={{ display: "flex", gap: ".5rem", alignItems: "center", marginTop: "1rem", justifyContent: "flex-end" }}>
-          <button className="admin-btn admin-btn-secondary admin-btn-sm" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - LIMIT))}>Previous</button>
-          <span style={{ fontSize: ".875rem", color: "#5c6670" }}>Page {currentPage} of {totalPages}</span>
-          <button className="admin-btn admin-btn-secondary admin-btn-sm" disabled={offset + LIMIT >= total} onClick={() => setOffset(offset + LIMIT)}>Next</button>
+        <div
+          style={{
+            display: "flex",
+            gap: ".5rem",
+            alignItems: "center",
+            marginTop: "1rem",
+            justifyContent: "flex-end",
+          }}
+        >
+          <button
+            className="admin-btn admin-btn-secondary admin-btn-sm"
+            disabled={offset === 0}
+            onClick={() => setOffset(Math.max(0, offset - LIMIT))}
+          >
+            Previous
+          </button>
+          <span style={{ fontSize: ".875rem", color: "#5c6670" }}>
+            Page {currentPage} of {totalPages}
+          </span>
+          <button
+            className="admin-btn admin-btn-secondary admin-btn-sm"
+            disabled={offset + LIMIT >= total}
+            onClick={() => setOffset(offset + LIMIT)}
+          >
+            Next
+          </button>
         </div>
       )}
 
@@ -141,11 +226,31 @@ export default function CommunitiesPage() {
         <div className="admin-modal-backdrop">
           <div className="admin-modal">
             <div className="admin-modal-header">
-              <h2 style={{ margin: 0, fontSize: "1rem", textTransform: "capitalize" }}>{actionModal.action} Community</h2>
-              <button className="admin-btn admin-btn-secondary admin-btn-sm" onClick={() => setActionModal(null)}>✕</button>
+              <h2
+                style={{
+                  margin: 0,
+                  fontSize: "1rem",
+                  textTransform: "capitalize",
+                }}
+              >
+                {actionModal.action} Community
+              </h2>
+              <button
+                className="admin-btn admin-btn-secondary admin-btn-sm"
+                onClick={() => setActionModal(null)}
+              >
+                ✕
+              </button>
             </div>
-            <p style={{ fontSize: ".875rem", color: "#5c6670", marginBottom: "1rem" }}>
-              {actionModal.action.charAt(0).toUpperCase() + actionModal.action.slice(1)}{" "}
+            <p
+              style={{
+                fontSize: ".875rem",
+                color: "#5c6670",
+                marginBottom: "1rem",
+              }}
+            >
+              {actionModal.action.charAt(0).toUpperCase() +
+                actionModal.action.slice(1)}{" "}
               <strong>&quot;{actionModal.communityName}&quot;</strong>?
             </p>
             <textarea
@@ -156,14 +261,28 @@ export default function CommunitiesPage() {
               value={actionReason}
               onChange={(e) => setActionReason(e.target.value)}
             />
-            <div style={{ display: "flex", gap: ".75rem", marginTop: "1rem", justifyContent: "flex-end" }}>
-              <button className="admin-btn admin-btn-secondary" onClick={() => setActionModal(null)}>Cancel</button>
+            <div
+              style={{
+                display: "flex",
+                gap: ".75rem",
+                marginTop: "1rem",
+                justifyContent: "flex-end",
+              }}
+            >
+              <button
+                className="admin-btn admin-btn-secondary"
+                onClick={() => setActionModal(null)}
+              >
+                Cancel
+              </button>
               <button
                 className={`admin-btn ${actionModal.action === "suspend" ? "admin-btn-danger" : "admin-btn-primary"}`}
                 onClick={handleAction}
                 disabled={actionLoading}
               >
-                {actionLoading ? "Processing…" : `Confirm ${actionModal.action}`}
+                {actionLoading
+                  ? "Processing…"
+                  : `Confirm ${actionModal.action}`}
               </button>
             </div>
           </div>

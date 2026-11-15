@@ -351,7 +351,7 @@ async def run() -> None:
                 )
 
     print("\n" + "=" * 60)
-    print("Demo credentials (password: {}):".format(DEMO_PASSWORD))
+    print(f"Demo credentials (password: {DEMO_PASSWORD}):")
     print("=" * 60)
     for u in USERS:
         print(f"  {u.email:32s}  {u.city.city:12s}  ({u.city.latitude}, {u.city.longitude})")

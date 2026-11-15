@@ -80,6 +80,9 @@ src/oldpages_api/donations/repository.py
 src/oldpages_api/donations/router.py
 src/oldpages_api/donations/schemas.py
 src/oldpages_api/donations/service.py
+src/oldpages_api/email/__init__.py
+src/oldpages_api/email/client.py
+src/oldpages_api/email/templates.py
 src/oldpages_api/example/router.py
 src/oldpages_api/example/schemas.py
 src/oldpages_api/example/service.py
@@ -88,6 +91,7 @@ src/oldpages_api/geo/dependencies.py
 src/oldpages_api/geo/http.py
 src/oldpages_api/geo/ip.py
 src/oldpages_api/geo/nominatim.py
+src/oldpages_api/geo/pincode.py
 src/oldpages_api/geo/router.py
 src/oldpages_api/geo/schemas.py
 src/oldpages_api/geo/service.py
@@ -172,6 +176,7 @@ src/oldpages_api/scripts/__init__.py
 src/oldpages_api/scripts/create_superuser.py
 src/oldpages_api/scripts/export_openapi.py
 src/oldpages_api/scripts/seed_foundation.py
+src/oldpages_api/scripts/seed_locations.py
 src/oldpages_api/search/__init__.py
 src/oldpages_api/search/events.py
 src/oldpages_api/search/exceptions.py

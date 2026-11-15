@@ -7,6 +7,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from conftest import RegisterUser
+from helpers import grant_role
 from oldpages_api.catalog.models import Category
 
 
@@ -50,10 +51,26 @@ async def test_catalog_entry_create_read_search_and_correct(
     assert isbn_search_response.status_code == 200
     assert isbn_search_response.json()["items"][0]["id"] == book["id"]
 
+    correction = {"metadata_status": "verified", "page_count": 336}
+    other_seller = await register_user(client, email="other@example.com", username="other")
+    refused = await client.patch(
+        f"/api/v1/books/{book['id']}",
+        headers={"Authorization": f"Bearer {other_seller['tokens']['access_token']}"},
+        json=correction,
+    )
+    assert refused.status_code == 403, refused.text
+    refused_creator = await client.patch(
+        f"/api/v1/books/{book['id']}",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json=correction,
+    )
+    assert refused_creator.status_code == 403, refused_creator.text
+
+    await grant_role(session_factory, registered["user"]["id"], "catalog_manager")
     patch_response = await client.patch(
         f"/api/v1/books/{book['id']}",
         headers={"Authorization": f"Bearer {access_token}"},
-        json={"metadata_status": "verified", "page_count": 336},
+        json=correction,
     )
     assert patch_response.status_code == 200
     assert patch_response.json()["metadata_status"] == "verified"
@@ -137,12 +154,16 @@ async def test_category_tree_supports_arbitrary_depth(
         await session.commit()
 
     response = await client.get("/api/v1/categories")
+    full = await client.get("/api/v1/categories", params={"max_depth": 10})
 
     assert response.status_code == 200
+    assert response.headers["cache-control"].startswith("public")
     root_node = response.json()["items"][0]
     assert root_node["slug"] == "academic"
     assert root_node["children"][0]["slug"] == "engineering"
-    assert root_node["children"][0]["children"][0]["slug"] == "computer-science"
+    assert root_node["children"][0]["children"] == []  # two levels unless asked
+    deep = full.json()["items"][0]["children"][0]["children"]
+    assert deep[0]["slug"] == "computer-science"
 
 
 @pytest.mark.asyncio

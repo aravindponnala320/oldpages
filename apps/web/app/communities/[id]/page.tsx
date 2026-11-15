@@ -13,12 +13,12 @@ import {
   EmptyState,
   Icon,
   LinkButton,
-  Section,
   Spinner,
   Tabs,
   Textarea,
   colors,
   font,
+  formatPrice,
   radius,
   shadow,
   useToast,
@@ -57,32 +57,76 @@ function PostCard({
         boxShadow: shadow.sm,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          marginBottom: 10,
+        }}
+      >
         <Avatar name={`User ${post.author.id.slice(0, 4)}`} size="sm" />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ margin: 0, fontWeight: font.weight.semibold, fontSize: font.size.base, color: colors.text }}>
+          <p
+            style={{
+              margin: 0,
+              fontWeight: font.weight.semibold,
+              fontSize: font.size.base,
+              color: colors.text,
+            }}
+          >
             User {post.author.id.slice(0, 8)}
           </p>
-          <p style={{ margin: 0, fontSize: font.size.xs, color: colors.textFaint }}>
+          <p
+            style={{
+              margin: 0,
+              fontSize: font.size.xs,
+              color: colors.textFaint,
+            }}
+          >
             {new Date(post.created_at).toLocaleString()}
           </p>
         </div>
         <div style={{ display: "flex", gap: 4 }}>
           {post.is_pinned && <Badge variant="info" label="Pinned" />}
-          {post.is_announcement && <Badge variant="warning" label="Announcement" />}
+          {post.is_announcement && (
+            <Badge variant="warning" label="Announcement" />
+          )}
         </div>
       </div>
       {post.title && (
-        <h3 style={{ margin: "0 0 6px", fontSize: font.size.md, fontWeight: font.weight.semibold, color: colors.text }}>
+        <h3
+          style={{
+            margin: "0 0 6px",
+            fontSize: font.size.md,
+            fontWeight: font.weight.semibold,
+            color: colors.text,
+          }}
+        >
           {post.title}
         </h3>
       )}
       {post.body && (
-        <p style={{ margin: "0 0 12px", fontSize: font.size.base, color: colors.textMuted, lineHeight: font.lineHeight.relaxed }}>
+        <p
+          style={{
+            margin: "0 0 12px",
+            fontSize: font.size.base,
+            color: colors.textMuted,
+            lineHeight: font.lineHeight.relaxed,
+          }}
+        >
           {post.body}
         </p>
       )}
-      <div style={{ display: "flex", alignItems: "center", gap: 6, borderTop: `1px solid ${colors.divider}`, paddingTop: 10 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          borderTop: `1px solid ${colors.divider}`,
+          paddingTop: 10,
+        }}
+      >
         {REACTIONS.map((r) => {
           const active = post.viewer_reaction === r.type;
           return (
@@ -103,7 +147,13 @@ function PostCard({
             </button>
           );
         })}
-        <span style={{ fontSize: font.size.sm, color: colors.textFaint, marginLeft: "auto" }}>
+        <span
+          style={{
+            fontSize: font.size.sm,
+            color: colors.textFaint,
+            marginLeft: "auto",
+          }}
+        >
           {post.comment_count} comment{post.comment_count !== 1 ? "s" : ""}
         </span>
       </div>
@@ -159,7 +209,13 @@ function CreatePostForm({
         rows={3}
         containerStyle={{ marginBottom: 10 }}
       />
-      <Button variant="primary" size="sm" loading={loading} disabled={!body.trim()} onClick={handleSubmit}>
+      <Button
+        variant="primary"
+        size="sm"
+        loading={loading}
+        disabled={!body.trim()}
+        onClick={handleSubmit}
+      >
         Post
       </Button>
     </div>
@@ -182,7 +238,9 @@ export default function CommunityDetailPage() {
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => { loadCommunity(); }, [id]);
+  useEffect(() => {
+    loadCommunity();
+  }, [id]);
 
   useEffect(() => {
     if (!community) return;
@@ -210,17 +268,23 @@ export default function CommunityDetailPage() {
     try {
       const res = await apiClient.getCommunityFeed(id, {}, token);
       setFeed(res.items);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 
-  async function loadMembers() { setMembers([]); }
+  async function loadMembers() {
+    setMembers([]);
+  }
 
   async function loadEvents() {
     const token = getAccessToken() ?? undefined;
     try {
       const res = await apiClient.listEvents({ community_id: id }, token);
       setEvents(res.items);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 
   async function loadMarketplace() {
@@ -228,17 +292,30 @@ export default function CommunityDetailPage() {
     try {
       const res = await apiClient.getCommunityMarketplace(id, {}, token);
       setMarketplace(res.items);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 
   const handleJoin = async () => {
-    if (!isAuthenticated) { router.push("/"); return; }
+    if (!isAuthenticated) {
+      router.push("/");
+      return;
+    }
     const token = getAccessToken();
     if (!token) return;
     setJoining(true);
     try {
       await apiClient.joinCommunity(id, {}, token);
-      setCommunity((c) => (c ? { ...c, viewer_membership_status: "active" as const, member_count: c.member_count + 1 } : c));
+      setCommunity((c) =>
+        c
+          ? {
+              ...c,
+              viewer_membership_status: "active" as const,
+              member_count: c.member_count + 1,
+            }
+          : c,
+      );
       toast("Joined community", "success");
     } catch {
       toast("Failed to join community", "error");
@@ -258,17 +335,34 @@ export default function CommunityDetailPage() {
           if (p.id !== postId) return p;
           const wasSame = p.viewer_reaction === type;
           const counts = { ...p.reaction_counts };
-          if (p.viewer_reaction) counts[p.viewer_reaction] = Math.max(0, (counts[p.viewer_reaction] ?? 1) - 1);
+          if (p.viewer_reaction)
+            counts[p.viewer_reaction] = Math.max(
+              0,
+              (counts[p.viewer_reaction] ?? 1) - 1,
+            );
           if (!wasSame) counts[type] = (counts[type] ?? 0) + 1;
-          return { ...p, viewer_reaction: wasSame ? null : type, reaction_counts: counts };
+          return {
+            ...p,
+            viewer_reaction: wasSame ? null : type,
+            reaction_counts: counts,
+          };
         }),
       );
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   };
 
   if (loading) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: "60vh",
+        }}
+      >
         <Spinner size="lg" />
       </div>
     );
@@ -278,10 +372,21 @@ export default function CommunityDetailPage() {
     return (
       <div style={{ padding: "24px 0" }}>
         <Container>
-          <div style={{ background: colors.dangerSoft, border: `1px solid #fecaca`, color: colors.dangerText, borderRadius: radius.lg, padding: "14px 18px", marginBottom: 16 }}>
+          <div
+            style={{
+              background: colors.dangerSoft,
+              border: `1px solid #fecaca`,
+              color: colors.dangerText,
+              borderRadius: radius.lg,
+              padding: "14px 18px",
+              marginBottom: 16,
+            }}
+          >
             {error ?? "Community not found"}
           </div>
-          <Button variant="ghost" onClick={() => router.back()}>← Back</Button>
+          <Button variant="ghost" onClick={() => router.back()}>
+            ← Back
+          </Button>
         </Container>
       </div>
     );
@@ -302,7 +407,14 @@ export default function CommunityDetailPage() {
             boxShadow: shadow.sm,
           }}
         >
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 16,
+              flexWrap: "wrap",
+            }}
+          >
             <div
               style={{
                 width: 72,
@@ -319,32 +431,77 @@ export default function CommunityDetailPage() {
               📚
             </div>
             <div style={{ flex: 1, minWidth: 200 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
-                <h1 style={{ margin: 0, fontSize: font.size["2xl"], fontWeight: font.weight.bold, color: colors.text }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  marginBottom: 4,
+                  flexWrap: "wrap",
+                }}
+              >
+                <h1
+                  style={{
+                    margin: 0,
+                    fontSize: font.size["2xl"],
+                    fontWeight: font.weight.bold,
+                    color: colors.text,
+                  }}
+                >
                   {community.name}
                 </h1>
                 <Badge label={community.community_type.replace(/_/g, " ")} />
                 {isMember && <Badge variant="success" label="Member" />}
               </div>
               {community.description && (
-                <p style={{ margin: "0 0 8px", fontSize: font.size.base, color: colors.textSubtle, lineHeight: font.lineHeight.snug }}>
+                <p
+                  style={{
+                    margin: "0 0 8px",
+                    fontSize: font.size.base,
+                    color: colors.textSubtle,
+                    lineHeight: font.lineHeight.snug,
+                  }}
+                >
                   {community.description}
                 </p>
               )}
               <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-                <span style={{ fontSize: font.size.sm, color: colors.textFaint }}>
+                <span
+                  style={{ fontSize: font.size.sm, color: colors.textFaint }}
+                >
                   {community.member_count.toLocaleString()} members
                 </span>
-                {community.city && <span style={{ fontSize: font.size.sm, color: colors.textFaint }}>{community.city}</span>}
+                {community.city && (
+                  <span
+                    style={{ fontSize: font.size.sm, color: colors.textFaint }}
+                  >
+                    {community.city}
+                  </span>
+                )}
               </div>
             </div>
-            {!isMember && <Button variant="primary" loading={joining} onClick={handleJoin}>Join Community</Button>}
+            {!isMember && (
+              <Button variant="primary" loading={joining} onClick={handleJoin}>
+                Join Community
+              </Button>
+            )}
           </div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 16 }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns:
+              "repeat(auto-fit, minmax(min(100%, 150px), 1fr))",
+            gap: 12,
+            marginBottom: 16,
+          }}
+        >
           {[
-            { label: "Members", value: community.member_count.toLocaleString() },
+            {
+              label: "Members",
+              value: community.member_count.toLocaleString(),
+            },
             { label: "Posts", value: feed.length || "—" },
             { label: "Events", value: events.length || "—" },
           ].map((s) => (
@@ -358,8 +515,24 @@ export default function CommunityDetailPage() {
                 textAlign: "center",
               }}
             >
-              <div style={{ fontSize: font.size["2xl"], fontWeight: font.weight.heavy, color: colors.text }}>{s.value}</div>
-              <div style={{ fontSize: font.size.sm, color: colors.textSubtle, marginTop: 2 }}>{s.label}</div>
+              <div
+                style={{
+                  fontSize: font.size["2xl"],
+                  fontWeight: font.weight.heavy,
+                  color: colors.text,
+                }}
+              >
+                {s.value}
+              </div>
+              <div
+                style={{
+                  fontSize: font.size.sm,
+                  color: colors.textSubtle,
+                  marginTop: 2,
+                }}
+              >
+                {s.label}
+              </div>
             </div>
           ))}
         </div>
@@ -379,21 +552,30 @@ export default function CommunityDetailPage() {
 
         {tab === "feed" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {isMember && <CreatePostForm communityId={id} onPosted={(post) => setFeed((prev) => [post, ...prev])} />}
+            {isMember && (
+              <CreatePostForm
+                communityId={id}
+                onPosted={(post) => setFeed((prev) => [post, ...prev])}
+              />
+            )}
             {feed.length === 0 ? (
               <EmptyState
                 icon={<Icon.chat size={26} color={colors.primary} />}
                 title={isMember ? "Be the first to post!" : "No posts yet"}
-                description={isMember ? undefined : "Join the community to participate."}
+                description={
+                  isMember ? undefined : "Join the community to participate."
+                }
               />
             ) : (
-              feed.map((post) => <PostCard key={post.id} post={post} onReact={handleReact} />)
+              feed.map((post) => (
+                <PostCard key={post.id} post={post} onReact={handleReact} />
+              ))
             )}
           </div>
         )}
 
-        {tab === "members" && (
-          members.length === 0 ? (
+        {tab === "members" &&
+          (members.length === 0 ? (
             <EmptyState
               icon={<Icon.user size={26} color={colors.primary} />}
               title="Member list not available"
@@ -415,25 +597,38 @@ export default function CommunityDetailPage() {
                   }}
                 >
                   <Avatar name={`User ${m.user.id.slice(0, 4)}`} size="md" />
-                  <span style={{ flex: 1, fontWeight: font.weight.medium, fontSize: font.size.base, color: colors.text }}>
+                  <span
+                    style={{
+                      flex: 1,
+                      fontWeight: font.weight.medium,
+                      fontSize: font.size.base,
+                      color: colors.text,
+                    }}
+                  >
                     User {m.user.id.slice(0, 8)}
                   </span>
                   <Badge label={m.role} />
                 </div>
               ))}
             </div>
-          )
-        )}
+          ))}
 
-        {tab === "events" && (
-          events.length === 0 ? (
+        {tab === "events" &&
+          (events.length === 0 ? (
             <EmptyState
               icon={<Icon.book size={26} color={colors.primary} />}
               title="No upcoming events"
               description="Community events will appear here when scheduled."
             />
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 14 }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fill, minmax(min(100%, 320px), 1fr))",
+                gap: 14,
+              }}
+            >
               {events.map((event) => (
                 <div
                   key={event.id}
@@ -444,57 +639,123 @@ export default function CommunityDetailPage() {
                     padding: 16,
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                    <span style={{ fontWeight: font.weight.semibold, fontSize: font.size.md, color: colors.text }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      marginBottom: 8,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontWeight: font.weight.semibold,
+                        fontSize: font.size.md,
+                        color: colors.text,
+                      }}
+                    >
                       {event.title}
                     </span>
-                    <Badge variant="info" label={event.event_type.replace(/_/g, " ")} />
+                    <Badge
+                      variant="info"
+                      label={event.event_type.replace(/_/g, " ")}
+                    />
                   </div>
-                  <p style={{ margin: "0 0 4px", fontSize: font.size.sm, color: colors.textSubtle }}>
+                  <p
+                    style={{
+                      margin: "0 0 4px",
+                      fontSize: font.size.sm,
+                      color: colors.textSubtle,
+                    }}
+                  >
                     {new Date(event.starts_at).toLocaleString()}
                   </p>
                   {event.location_name && (
-                    <p style={{ margin: "0 0 4px", fontSize: font.size.sm, color: colors.textSubtle }}>
+                    <p
+                      style={{
+                        margin: "0 0 4px",
+                        fontSize: font.size.sm,
+                        color: colors.textSubtle,
+                      }}
+                    >
                       {event.location_name}
                     </p>
                   )}
-                  <p style={{ margin: "0 0 10px", fontSize: font.size.xs, color: colors.textFaint }}>
+                  <p
+                    style={{
+                      margin: "0 0 10px",
+                      fontSize: font.size.xs,
+                      color: colors.textFaint,
+                    }}
+                  >
                     {event.rsvp_count} going
                   </p>
-                  <LinkButton href={`/events/${event.id}`} variant="secondary" size="sm">View Event</LinkButton>
+                  <LinkButton
+                    href={`/events/${event.id}`}
+                    variant="secondary"
+                    size="sm"
+                  >
+                    View Event
+                  </LinkButton>
                 </div>
               ))}
             </div>
-          )
-        )}
+          ))}
 
-        {tab === "marketplace" && (
-          marketplace.length === 0 ? (
+        {tab === "marketplace" &&
+          (marketplace.length === 0 ? (
             <EmptyState
               icon={<Icon.book size={26} color={colors.primary} />}
               title="No listings yet"
               description="Community-member listings will appear here as they're published."
             />
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 14 }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fill, minmax(min(100%, 240px), 1fr))",
+                gap: 14,
+              }}
+            >
               {marketplace.map((l) => (
                 <LinkButton
                   key={l.id}
                   href={`/listings/${l.id}`}
                   variant="secondary"
-                  style={{ padding: 14, flexDirection: "column", alignItems: "flex-start", height: "auto", whiteSpace: "normal" }}
+                  style={{
+                    padding: 14,
+                    flexDirection: "column",
+                    alignItems: "flex-start",
+                    height: "auto",
+                    whiteSpace: "normal",
+                  }}
                 >
-                  <h3 style={{ margin: 0, fontSize: font.size.base, fontWeight: font.weight.semibold, color: colors.text, textAlign: "left" }}>
+                  <h3
+                    style={{
+                      margin: 0,
+                      fontSize: font.size.base,
+                      fontWeight: font.weight.semibold,
+                      color: colors.text,
+                      textAlign: "left",
+                    }}
+                  >
                     {l.title}
                   </h3>
-                  <p style={{ margin: "6px 0 0", fontSize: font.size.md, fontWeight: font.weight.bold, color: colors.text }}>
-                    {l.price_amount_cents != null ? `₹${(l.price_amount_cents / 100).toLocaleString()}` : "Free"}
+                  <p
+                    style={{
+                      margin: "6px 0 0",
+                      fontSize: font.size.md,
+                      fontWeight: font.weight.bold,
+                      color: colors.text,
+                    }}
+                  >
+                    {formatPrice(l.price_amount_cents, l.currency)}
                   </p>
                 </LinkButton>
               ))}
             </div>
-          )
-        )}
+          ))}
       </Container>
     </div>
   );

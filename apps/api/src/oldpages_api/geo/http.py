@@ -11,7 +11,7 @@ def get_http_client() -> Any:
     global _client
     if _client is None:
         try:
-            import httpx  # type: ignore[import-not-found]
+            import httpx
         except ImportError as exc:  # pragma: no cover - httpx is a dev/prod dep
             raise RuntimeError(
                 "httpx is required for outbound geo calls. Add httpx to project deps."

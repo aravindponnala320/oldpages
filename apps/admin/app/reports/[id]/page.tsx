@@ -93,7 +93,10 @@ function evidenceLinks(evidence: Record<string, unknown>): string[] {
   return Object.values(evidence).flatMap((value) => {
     if (typeof value === "string" && value.startsWith("http")) return [value];
     if (Array.isArray(value)) {
-      return value.filter((item): item is string => typeof item === "string" && item.startsWith("http"));
+      return value.filter(
+        (item): item is string =>
+          typeof item === "string" && item.startsWith("http"),
+      );
     }
     return [];
   });
@@ -130,15 +133,19 @@ export default function ReportDetailPage() {
     async function load() {
       setLoading(true);
       try {
-        const caseData = await adminFetch<ModerationCaseResponse>(`/admin/moderation/cases/${reportId}`);
+        const caseData = await adminFetch<ModerationCaseResponse>(
+          `/admin/moderation/cases/${reportId}`,
+        );
         setReport(mapCaseToReport(caseData));
-        setAudit(caseData.actions.map((entry) => ({
-          id: entry.id,
-          action: entry.action_type,
-          actor_email: entry.actor_user_id ?? undefined,
-          created_at: entry.created_at,
-          details: entry.reason ?? undefined,
-        })));
+        setAudit(
+          caseData.actions.map((entry) => ({
+            id: entry.id,
+            action: entry.action_type,
+            actor_email: entry.actor_user_id ?? undefined,
+            created_at: entry.created_at,
+            details: entry.reason ?? undefined,
+          })),
+        );
         setRelated([]);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load report");
@@ -169,15 +176,19 @@ export default function ReportDetailPage() {
       });
       setActionSuccess(true);
       setActionReason("");
-      const updated = await adminFetch<ModerationCaseResponse>(`/admin/moderation/cases/${reportId}`);
+      const updated = await adminFetch<ModerationCaseResponse>(
+        `/admin/moderation/cases/${reportId}`,
+      );
       setReport(mapCaseToReport(updated));
-      setAudit(updated.actions.map((entry) => ({
-        id: entry.id,
-        action: entry.action_type,
-        actor_email: entry.actor_user_id ?? undefined,
-        created_at: entry.created_at,
-        details: entry.reason ?? undefined,
-      })));
+      setAudit(
+        updated.actions.map((entry) => ({
+          id: entry.id,
+          action: entry.action_type,
+          actor_email: entry.actor_user_id ?? undefined,
+          created_at: entry.created_at,
+          details: entry.reason ?? undefined,
+        })),
+      );
     } catch (err) {
       alert(err instanceof Error ? err.message : "Action failed");
     } finally {
@@ -194,52 +205,132 @@ export default function ReportDetailPage() {
 
   const hasDuration = actionType === "suspend";
 
-  if (loading) return <div style={{ display: "flex", justifyContent: "center", padding: "3rem" }}><span className="spinner" /></div>;
-  if (error) return <div style={{ color: "#991b1b", padding: "1rem" }}>{error}</div>;
+  if (loading)
+    return (
+      <div
+        style={{ display: "flex", justifyContent: "center", padding: "3rem" }}
+      >
+        <span className="spinner" />
+      </div>
+    );
+  if (error)
+    return <div style={{ color: "#991b1b", padding: "1rem" }}>{error}</div>;
   if (!report) return null;
 
   return (
     <div>
       <div className="admin-page-header">
         <div style={{ display: "flex", alignItems: "center", gap: ".75rem" }}>
-          <button className="admin-btn admin-btn-secondary admin-btn-sm" onClick={() => router.back()}>← Back</button>
+          <button
+            className="admin-btn admin-btn-secondary admin-btn-sm"
+            onClick={() => router.back()}
+          >
+            ← Back
+          </button>
           <h1 className="admin-page-title">Report #{report.id.slice(0, 8)}</h1>
         </div>
         <div style={{ display: "flex", gap: ".5rem" }}>
-          <span className={`admin-badge ${severityColor[report.severity] ?? "admin-badge-gray"}`}>{report.severity}</span>
-          <span className={`admin-badge ${
-            report.status === "open" ? "admin-badge-yellow" :
-            report.status === "in_review" ? "admin-badge-blue" :
-            report.status === "actioned" ? "admin-badge-green" : "admin-badge-gray"
-          }`}>{report.status}</span>
+          <span
+            className={`admin-badge ${severityColor[report.severity] ?? "admin-badge-gray"}`}
+          >
+            {report.severity}
+          </span>
+          <span
+            className={`admin-badge ${
+              report.status === "open"
+                ? "admin-badge-yellow"
+                : report.status === "in_review"
+                  ? "admin-badge-blue"
+                  : report.status === "actioned"
+                    ? "admin-badge-green"
+                    : "admin-badge-gray"
+            }`}
+          >
+            {report.status}
+          </span>
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: "1.5rem", alignItems: "start" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 340px",
+          gap: "1.5rem",
+          alignItems: "start",
+        }}
+      >
+        <div
+          style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}
+        >
           {/* Report Summary */}
           <div className="admin-panel">
-            <h2 style={{ fontSize: ".9rem", fontWeight: 600, margin: "0 0 1rem", color: "#5c6670", textTransform: "uppercase", letterSpacing: ".04em" }}>Report Summary</h2>
-            <dl style={{ display: "grid", gridTemplateColumns: "140px 1fr", gap: ".5rem .75rem", margin: 0 }}>
+            <h2
+              style={{
+                fontSize: ".9rem",
+                fontWeight: 600,
+                margin: "0 0 1rem",
+                color: "#5c6670",
+                textTransform: "uppercase",
+                letterSpacing: ".04em",
+              }}
+            >
+              Report Summary
+            </h2>
+            <dl
+              style={{
+                display: "grid",
+                gridTemplateColumns: "140px 1fr",
+                gap: ".5rem .75rem",
+                margin: 0,
+              }}
+            >
               <dt style={{ fontSize: ".8rem", color: "#5c6670" }}>Type</dt>
-              <dd style={{ margin: 0 }}><span className="admin-badge admin-badge-blue">{report.report_type}</span></dd>
+              <dd style={{ margin: 0 }}>
+                <span className="admin-badge admin-badge-blue">
+                  {report.report_type}
+                </span>
+              </dd>
               <dt style={{ fontSize: ".8rem", color: "#5c6670" }}>Reason</dt>
               <dd style={{ margin: 0, fontWeight: 500 }}>{report.reason}</dd>
               {report.description && (
                 <>
-                  <dt style={{ fontSize: ".8rem", color: "#5c6670" }}>Description</dt>
-                  <dd style={{ margin: 0, fontSize: ".875rem", color: "#374151" }}>{report.description}</dd>
+                  <dt style={{ fontSize: ".8rem", color: "#5c6670" }}>
+                    Description
+                  </dt>
+                  <dd
+                    style={{ margin: 0, fontSize: ".875rem", color: "#374151" }}
+                  >
+                    {report.description}
+                  </dd>
                 </>
               )}
               <dt style={{ fontSize: ".8rem", color: "#5c6670" }}>Created</dt>
-              <dd style={{ margin: 0, fontSize: ".875rem" }}>{new Date(report.created_at).toLocaleString()}</dd>
+              <dd style={{ margin: 0, fontSize: ".875rem" }}>
+                {new Date(report.created_at).toLocaleString()}
+              </dd>
             </dl>
             {report.evidence && report.evidence.length > 0 && (
               <div style={{ marginTop: "1rem" }}>
-                <div style={{ fontSize: ".8rem", color: "#5c6670", marginBottom: ".5rem" }}>Evidence</div>
-                <div style={{ display: "flex", gap: ".5rem", flexWrap: "wrap" }}>
+                <div
+                  style={{
+                    fontSize: ".8rem",
+                    color: "#5c6670",
+                    marginBottom: ".5rem",
+                  }}
+                >
+                  Evidence
+                </div>
+                <div
+                  style={{ display: "flex", gap: ".5rem", flexWrap: "wrap" }}
+                >
                   {report.evidence.map((url, i) => (
-                    <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="admin-btn admin-btn-secondary admin-btn-sm">
+                    <a
+                      key={i}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="admin-btn admin-btn-secondary admin-btn-sm"
+                    >
                       Evidence {i + 1}
                     </a>
                   ))}
@@ -251,16 +342,46 @@ export default function ReportDetailPage() {
           {/* Reporter Info */}
           {report.reporter && (
             <div className="admin-panel">
-              <h2 style={{ fontSize: ".9rem", fontWeight: 600, margin: "0 0 1rem", color: "#5c6670", textTransform: "uppercase", letterSpacing: ".04em" }}>Reporter</h2>
-              <dl style={{ display: "grid", gridTemplateColumns: "100px 1fr", gap: ".5rem .75rem", margin: 0 }}>
+              <h2
+                style={{
+                  fontSize: ".9rem",
+                  fontWeight: 600,
+                  margin: "0 0 1rem",
+                  color: "#5c6670",
+                  textTransform: "uppercase",
+                  letterSpacing: ".04em",
+                }}
+              >
+                Reporter
+              </h2>
+              <dl
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "100px 1fr",
+                  gap: ".5rem .75rem",
+                  margin: 0,
+                }}
+              >
                 <dt style={{ fontSize: ".8rem", color: "#5c6670" }}>Name</dt>
                 <dd style={{ margin: 0 }}>{report.reporter.name ?? "—"}</dd>
                 <dt style={{ fontSize: ".8rem", color: "#5c6670" }}>Email</dt>
                 <dd style={{ margin: 0 }}>{report.reporter.email ?? "—"}</dd>
                 <dt style={{ fontSize: ".8rem", color: "#5c6670" }}>ID</dt>
-                <dd style={{ margin: 0, fontFamily: "monospace", fontSize: ".8rem" }}>{report.reporter.id}</dd>
+                <dd
+                  style={{
+                    margin: 0,
+                    fontFamily: "monospace",
+                    fontSize: ".8rem",
+                  }}
+                >
+                  {report.reporter.id}
+                </dd>
               </dl>
-              <button className="admin-btn admin-btn-secondary admin-btn-sm" style={{ marginTop: ".75rem" }} onClick={() => router.push(`/users/${report.reporter!.id}`)}>
+              <button
+                className="admin-btn admin-btn-secondary admin-btn-sm"
+                style={{ marginTop: ".75rem" }}
+                onClick={() => router.push(`/users/${report.reporter!.id}`)}
+              >
                 View User
               </button>
             </div>
@@ -269,28 +390,69 @@ export default function ReportDetailPage() {
           {/* Target Content */}
           {report.target && (
             <div className="admin-panel">
-              <h2 style={{ fontSize: ".9rem", fontWeight: 600, margin: "0 0 1rem", color: "#5c6670", textTransform: "uppercase", letterSpacing: ".04em" }}>
+              <h2
+                style={{
+                  fontSize: ".9rem",
+                  fontWeight: 600,
+                  margin: "0 0 1rem",
+                  color: "#5c6670",
+                  textTransform: "uppercase",
+                  letterSpacing: ".04em",
+                }}
+              >
                 Target ({report.target.type})
               </h2>
-              <dl style={{ display: "grid", gridTemplateColumns: "100px 1fr", gap: ".5rem .75rem", margin: 0 }}>
+              <dl
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "100px 1fr",
+                  gap: ".5rem .75rem",
+                  margin: 0,
+                }}
+              >
                 <dt style={{ fontSize: ".8rem", color: "#5c6670" }}>ID</dt>
-                <dd style={{ margin: 0, fontFamily: "monospace", fontSize: ".8rem" }}>{report.target.id}</dd>
+                <dd
+                  style={{
+                    margin: 0,
+                    fontFamily: "monospace",
+                    fontSize: ".8rem",
+                  }}
+                >
+                  {report.target.id}
+                </dd>
                 {report.target.title && (
                   <>
-                    <dt style={{ fontSize: ".8rem", color: "#5c6670" }}>Title</dt>
-                    <dd style={{ margin: 0, fontWeight: 500 }}>{report.target.title}</dd>
+                    <dt style={{ fontSize: ".8rem", color: "#5c6670" }}>
+                      Title
+                    </dt>
+                    <dd style={{ margin: 0, fontWeight: 500 }}>
+                      {report.target.title}
+                    </dd>
                   </>
                 )}
                 {report.target.user_email && (
                   <>
-                    <dt style={{ fontSize: ".8rem", color: "#5c6670" }}>User</dt>
+                    <dt style={{ fontSize: ".8rem", color: "#5c6670" }}>
+                      User
+                    </dt>
                     <dd style={{ margin: 0 }}>{report.target.user_email}</dd>
                   </>
                 )}
                 {report.target.content && (
                   <>
-                    <dt style={{ fontSize: ".8rem", color: "#5c6670" }}>Content</dt>
-                    <dd style={{ margin: 0, fontSize: ".875rem", color: "#374151", fontStyle: "italic" }}>&ldquo;{report.target.content}&rdquo;</dd>
+                    <dt style={{ fontSize: ".8rem", color: "#5c6670" }}>
+                      Content
+                    </dt>
+                    <dd
+                      style={{
+                        margin: 0,
+                        fontSize: ".875rem",
+                        color: "#374151",
+                        fontStyle: "italic",
+                      }}
+                    >
+                      &ldquo;{report.target.content}&rdquo;
+                    </dd>
                   </>
                 )}
               </dl>
@@ -300,19 +462,56 @@ export default function ReportDetailPage() {
           {/* Related Reports */}
           {related.length > 0 && (
             <div className="admin-panel">
-              <h2 style={{ fontSize: ".9rem", fontWeight: 600, margin: "0 0 1rem", color: "#5c6670", textTransform: "uppercase", letterSpacing: ".04em" }}>Related Reports</h2>
+              <h2
+                style={{
+                  fontSize: ".9rem",
+                  fontWeight: 600,
+                  margin: "0 0 1rem",
+                  color: "#5c6670",
+                  textTransform: "uppercase",
+                  letterSpacing: ".04em",
+                }}
+              >
+                Related Reports
+              </h2>
               <table className="admin-table">
                 <thead>
-                  <tr><th>ID</th><th>Reason</th><th>Severity</th><th>Status</th><th>Created</th></tr>
+                  <tr>
+                    <th>ID</th>
+                    <th>Reason</th>
+                    <th>Severity</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                  </tr>
                 </thead>
                 <tbody>
                   {related.map((r) => (
-                    <tr key={r.id} style={{ cursor: "pointer" }} onClick={() => router.push(`/reports/${r.id}`)}>
-                      <td style={{ fontFamily: "monospace", fontSize: ".8rem" }}>{r.id.slice(0, 8)}…</td>
+                    <tr
+                      key={r.id}
+                      style={{ cursor: "pointer" }}
+                      onClick={() => router.push(`/reports/${r.id}`)}
+                    >
+                      <td
+                        style={{ fontFamily: "monospace", fontSize: ".8rem" }}
+                      >
+                        {r.id.slice(0, 8)}…
+                      </td>
                       <td>{r.reason}</td>
-                      <td><span className={`admin-badge ${severityColor[r.severity] ?? "admin-badge-gray"}`}>{r.severity}</span></td>
-                      <td><span className="admin-badge admin-badge-gray">{r.status}</span></td>
-                      <td style={{ fontSize: ".8rem", color: "#5c6670" }}>{new Date(r.created_at).toLocaleDateString()}</td>
+                      <td>
+                        <span
+                          className={`admin-badge ${severityColor[r.severity] ?? "admin-badge-gray"}`}
+                        >
+                          {r.severity}
+                        </span>
+                      </td>
+                      <td>
+                        <span className="admin-badge admin-badge-gray">
+                          {r.status}
+                        </span>
+                      </td>
+                      <td style={{ fontSize: ".8rem", color: "#5c6670" }}>
+                        {new Date(r.created_at).toLocaleDateString()}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -322,17 +521,51 @@ export default function ReportDetailPage() {
 
           {/* Audit History */}
           <div className="admin-panel">
-            <h2 style={{ fontSize: ".9rem", fontWeight: 600, margin: "0 0 1rem", color: "#5c6670", textTransform: "uppercase", letterSpacing: ".04em" }}>Audit History</h2>
+            <h2
+              style={{
+                fontSize: ".9rem",
+                fontWeight: 600,
+                margin: "0 0 1rem",
+                color: "#5c6670",
+                textTransform: "uppercase",
+                letterSpacing: ".04em",
+              }}
+            >
+              Audit History
+            </h2>
             {audit.length === 0 ? (
-              <p style={{ fontSize: ".875rem", color: "#5c6670" }}>No audit entries yet.</p>
+              <p style={{ fontSize: ".875rem", color: "#5c6670" }}>
+                No audit entries yet.
+              </p>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: ".5rem" }}>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: ".5rem",
+                }}
+              >
                 {audit.map((entry) => (
-                  <div key={entry.id} style={{ fontSize: ".8rem", borderLeft: "2px solid #d9ddd6", paddingLeft: ".75rem" }}>
+                  <div
+                    key={entry.id}
+                    style={{
+                      fontSize: ".8rem",
+                      borderLeft: "2px solid #d9ddd6",
+                      paddingLeft: ".75rem",
+                    }}
+                  >
                     <div style={{ fontWeight: 500 }}>{entry.action}</div>
-                    {entry.actor_email && <div style={{ color: "#5c6670" }}>by {entry.actor_email}</div>}
-                    {entry.details && <div style={{ color: "#374151" }}>{entry.details}</div>}
-                    <div style={{ color: "#9ca3af", marginTop: ".2rem" }}>{new Date(entry.created_at).toLocaleString()}</div>
+                    {entry.actor_email && (
+                      <div style={{ color: "#5c6670" }}>
+                        by {entry.actor_email}
+                      </div>
+                    )}
+                    {entry.details && (
+                      <div style={{ color: "#374151" }}>{entry.details}</div>
+                    )}
+                    <div style={{ color: "#9ca3af", marginTop: ".2rem" }}>
+                      {new Date(entry.created_at).toLocaleString()}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -341,19 +574,59 @@ export default function ReportDetailPage() {
         </div>
 
         {/* Moderation Action Panel */}
-        <div className="admin-panel" style={{ position: "sticky", top: "1rem" }}>
-          <h2 style={{ fontSize: ".9rem", fontWeight: 600, margin: "0 0 1rem", color: "#5c6670", textTransform: "uppercase", letterSpacing: ".04em" }}>Take Action</h2>
+        <div
+          className="admin-panel"
+          style={{ position: "sticky", top: "1rem" }}
+        >
+          <h2
+            style={{
+              fontSize: ".9rem",
+              fontWeight: 600,
+              margin: "0 0 1rem",
+              color: "#5c6670",
+              textTransform: "uppercase",
+              letterSpacing: ".04em",
+            }}
+          >
+            Take Action
+          </h2>
 
           {actionSuccess && (
-            <div style={{ background: "#d1fae5", color: "#065f46", padding: ".75rem", borderRadius: 6, marginBottom: "1rem", fontSize: ".875rem" }}>
+            <div
+              style={{
+                background: "#d1fae5",
+                color: "#065f46",
+                padding: ".75rem",
+                borderRadius: 6,
+                marginBottom: "1rem",
+                fontSize: ".875rem",
+              }}
+            >
               Action taken successfully.
             </div>
           )}
 
-          <form onSubmit={handleTakeAction} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          <form
+            onSubmit={handleTakeAction}
+            style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
+          >
             <div>
-              <label style={{ fontSize: ".8rem", fontWeight: 500, display: "block", marginBottom: ".375rem" }}>Action Type</label>
-              <select className="admin-select" style={{ width: "100%" }} value={actionType} onChange={(e) => setActionType(e.target.value)}>
+              <label
+                style={{
+                  fontSize: ".8rem",
+                  fontWeight: 500,
+                  display: "block",
+                  marginBottom: ".375rem",
+                }}
+              >
+                Action Type
+              </label>
+              <select
+                className="admin-select"
+                style={{ width: "100%" }}
+                value={actionType}
+                onChange={(e) => setActionType(e.target.value)}
+              >
                 <option value="warn">Warn user</option>
                 <option value="remove_content">Remove content</option>
                 <option value="suspend">Suspend user</option>
@@ -366,8 +639,22 @@ export default function ReportDetailPage() {
 
             {hasDuration && (
               <div>
-                <label style={{ fontSize: ".8rem", fontWeight: 500, display: "block", marginBottom: ".375rem" }}>Duration</label>
-                <select className="admin-select" style={{ width: "100%" }} value={duration} onChange={(e) => setDuration(e.target.value)}>
+                <label
+                  style={{
+                    fontSize: ".8rem",
+                    fontWeight: 500,
+                    display: "block",
+                    marginBottom: ".375rem",
+                  }}
+                >
+                  Duration
+                </label>
+                <select
+                  className="admin-select"
+                  style={{ width: "100%" }}
+                  value={duration}
+                  onChange={(e) => setDuration(e.target.value)}
+                >
                   <option value="1d">1 day</option>
                   <option value="7d">7 days</option>
                   <option value="30d">30 days</option>
@@ -377,7 +664,16 @@ export default function ReportDetailPage() {
             )}
 
             <div>
-              <label style={{ fontSize: ".8rem", fontWeight: 500, display: "block", marginBottom: ".375rem" }}>Reason</label>
+              <label
+                style={{
+                  fontSize: ".8rem",
+                  fontWeight: 500,
+                  display: "block",
+                  marginBottom: ".375rem",
+                }}
+              >
+                Reason
+              </label>
               <textarea
                 className="admin-input"
                 rows={4}

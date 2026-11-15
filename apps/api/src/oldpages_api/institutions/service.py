@@ -28,8 +28,8 @@ from oldpages_api.institutions.permissions import require_institution_admin
 from oldpages_api.institutions.repository import InstitutionRepository
 from oldpages_api.institutions.schemas import (
     AddDomainRequest,
-    ApproveMemberRequest,
     ApprovalActionRequest,
+    ApproveMemberRequest,
     InstitutionCreateRequest,
     InstitutionDomainResponse,
     InstitutionListResponse,

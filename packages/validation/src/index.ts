@@ -6,7 +6,7 @@ export const componentStatusSchema = z.object({
 });
 
 export const healthResponseSchema = z.object({
-  components: z.record(componentStatusSchema),
+  components: z.record(z.string(), componentStatusSchema),
   environment: z.string(),
   service: z.string(),
   status: z.enum(["ok", "degraded"]),
@@ -56,8 +56,8 @@ export const userPrivateResponseSchema = z.object({
   institution: z.string().nullable(),
   languages: z.array(z.string()),
   mobile_verified: z.boolean(),
-  preferences: z.record(z.union([z.string(), z.boolean()])),
-  privacy: z.record(z.union([z.string(), z.boolean()])),
+  preferences: z.record(z.string(), z.union([z.string(), z.boolean()])),
+  privacy: z.record(z.string(), z.union([z.string(), z.boolean()])),
   profile_image_url: z.string().nullable(),
   reading_interests: z.array(z.string()),
   status: z.string(),
@@ -181,6 +181,23 @@ export const categoryTreeResponseSchema = z.object({
   items: z.array(categoryNodeSchema),
 });
 
+const categoryOptionSchema = z.object({
+  has_children: z.boolean(),
+  name: z.string(),
+  slug: z.string(),
+});
+
+export const categoryLevelsResponseSchema = z.object({
+  levels: z.array(
+    z.object({
+      label: z.string(),
+      options: z.array(categoryOptionSchema),
+      parent_slug: z.string().nullable().optional(),
+    }),
+  ),
+  path: z.array(categoryOptionSchema),
+});
+
 export const authorListResponseSchema = z.object({
   items: z.array(authorSummarySchema),
   next_cursor: z.string().nullable().optional(),
@@ -297,6 +314,13 @@ export const listingImageResponseSchema = z.object({
 
 export const listingResponseSchema = z.object({
   book: z.object({ id: z.string(), title: z.string() }),
+  category: z
+    .object({ name: z.string(), slug: z.string() })
+    .nullable()
+    .optional(),
+  visibility: z
+    .enum(["public", "private", "business_only", "institution_only"])
+    .optional(),
   condition: listingConditionSchema.nullable().optional(),
   created_at: z.string(),
   currency: z.string(),
@@ -405,7 +429,7 @@ export const searchSuggestionResponseSchema = z.object({
 
 export const savedSearchResponseSchema = z.object({
   created_at: z.string(),
-  filters: z.record(z.unknown()),
+  filters: z.record(z.string(), z.unknown()),
   id: z.string(),
   last_matched_at: z.string().nullable().optional(),
   last_result_count: z.number(),
@@ -441,7 +465,7 @@ export const followResponseSchema = z.object({
 
 export const mediaUploadUrlResponseSchema = z.object({
   expires_at: z.string(),
-  headers: z.record(z.string()),
+  headers: z.record(z.string(), z.string()),
   id: z.string(),
   storage_key: z.string(),
   upload_url: z.string(),
@@ -506,7 +530,7 @@ export const messageAttachmentResponseSchema = z.object({
   attachment_type: messageAttachmentTypeSchema,
   id: z.string(),
   media_id: z.string(),
-  metadata: z.record(z.unknown()),
+  metadata: z.record(z.string(), z.unknown()),
   public_url: z.string().nullable().optional(),
   sort_order: z.number(),
 });
@@ -520,7 +544,7 @@ export const messageResponseSchema = z.object({
   id: z.string(),
   listing_id: z.string().nullable().optional(),
   message_type: messageTypeSchema,
-  metadata: z.record(z.unknown()),
+  metadata: z.record(z.string(), z.unknown()),
   read_by_user_ids: z.array(z.string()),
   sender: chatUserSummarySchema,
 });
@@ -564,7 +588,7 @@ export const notificationDeliveryResponseSchema = z.object({
 export const notificationResponseSchema = z.object({
   body: z.string(),
   created_at: z.string(),
-  data: z.record(z.unknown()),
+  data: z.record(z.string(), z.unknown()),
   deliveries: z.array(notificationDeliveryResponseSchema),
   id: z.string(),
   read_at: z.string().nullable().optional(),
@@ -776,7 +800,7 @@ export const reportResponseSchema = z.object({
   case_id: z.string().nullable().optional(),
   created_at: z.string(),
   description: z.string().nullable().optional(),
-  evidence: z.record(z.unknown()),
+  evidence: z.record(z.string(), z.unknown()),
   id: z.string(),
   reason: z.string(),
   reporter: trustUserSummarySchema,
@@ -793,9 +817,9 @@ export const moderationActionResponseSchema = z.object({
   actor_user_id: z.string().nullable().optional(),
   created_at: z.string(),
   duration_until: z.string().nullable().optional(),
-  evidence_snapshot: z.record(z.unknown()),
+  evidence_snapshot: z.record(z.string(), z.unknown()),
   id: z.string(),
-  metadata: z.record(z.unknown()),
+  metadata: z.record(z.string(), z.unknown()),
   moderator_user_id: z.string().nullable().optional(),
   reason: z.string().nullable().optional(),
 });
@@ -804,7 +828,7 @@ export const moderationCaseResponseSchema = z.object({
   actions: z.array(moderationActionResponseSchema),
   assigned_moderator_user_id: z.string().nullable().optional(),
   created_at: z.string(),
-  evidence_snapshot: z.record(z.unknown()),
+  evidence_snapshot: z.record(z.string(), z.unknown()),
   id: z.string(),
   priority_score: z.number(),
   report: reportResponseSchema,
@@ -851,7 +875,7 @@ export const moderationListingResponseSchema = z.object({
 export const moderationRuleConfigResponseSchema = z.object({
   action_types: z.array(z.string()),
   moderator_roles: z.array(z.string()),
-  severity_by_reason: z.record(reportReasonSchema, reportSeveritySchema),
+  severity_by_reason: z.partialRecord(reportReasonSchema, reportSeveritySchema),
 });
 
 export const communityVisibilitySchema = z.enum([
@@ -979,7 +1003,7 @@ export const communityCreateRequestSchema = z.object({
   membership_policy: communityMembershipPolicySchema.nullable().optional(),
   name: z.string(),
   rules: z.array(communityRuleInputSchema).optional(),
-  settings: z.record(z.unknown()).optional(),
+  settings: z.record(z.string(), z.unknown()).optional(),
   slug: z.string().nullable().optional(),
   state: z.string().nullable().optional(),
   visibility: communityVisibilitySchema.optional(),
@@ -1059,9 +1083,9 @@ export const communityPostResponseSchema = z.object({
   is_announcement: z.boolean(),
   is_pinned: z.boolean(),
   listing_id: z.string().nullable().optional(),
-  poll: z.record(z.unknown()),
+  poll: z.record(z.string(), z.unknown()),
   post_type: communityPostTypeSchema,
-  reaction_counts: z.record(z.number()),
+  reaction_counts: z.record(z.string(), z.number()),
   status: communityPostStatusSchema,
   title: z.string().nullable().optional(),
   viewer_reaction: postReactionTypeSchema.nullable().optional(),
@@ -1171,7 +1195,7 @@ export const bookClubCreateRequestSchema = z.object({
   community_id: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
   name: z.string(),
-  settings: z.record(z.unknown()).optional(),
+  settings: z.record(z.string(), z.unknown()).optional(),
   slug: z.string().nullable().optional(),
   timezone: z.string().optional(),
   visibility: clubVisibilitySchema.optional(),
@@ -1228,7 +1252,7 @@ export const buddyReadProgressRequestSchema = z.object({
 
 export const readalongCreateRequestSchema = z.object({
   book_id: z.string(),
-  chapter_schedule: z.array(z.record(z.unknown())).optional(),
+  chapter_schedule: z.array(z.record(z.string(), z.unknown())).optional(),
   community_id: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
   ends_at: z.string().nullable().optional(),
@@ -1247,7 +1271,7 @@ export const eventCreateRequestSchema = z.object({
   ends_at: z.string(),
   event_type: eventTypeSchema,
   location_name: z.string().nullable().optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
   online_url: z.string().nullable().optional(),
   starts_at: z.string(),
   timezone: z.string(),
@@ -1352,7 +1376,7 @@ export const buddyReadResponseSchema = z.object({
   id: z.string(),
   max_participants: z.number(),
   participant_user_ids: z.array(z.string()),
-  progress: z.record(z.unknown()),
+  progress: z.record(z.string(), z.unknown()),
   status: buddyReadStatusSchema,
   title: z.string(),
   visibility: clubVisibilitySchema,
@@ -1360,7 +1384,7 @@ export const buddyReadResponseSchema = z.object({
 
 export const readalongResponseSchema = z.object({
   book: clubBookSummarySchema,
-  chapter_schedule: z.array(z.record(z.unknown())),
+  chapter_schedule: z.array(z.record(z.string(), z.unknown())),
   community_id: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
   ends_at: z.string().nullable().optional(),
@@ -1524,7 +1548,7 @@ export const readingProgressUpdateRequestSchema = z.object({
 export const readingProgressResponseSchema = z.object({
   book: readingBookSummarySchema,
   current_page: z.number().nullable().optional(),
-  daily_minutes: z.record(z.number()),
+  daily_minutes: z.record(z.string(), z.number()),
   finished_on: z.string().nullable().optional(),
   id: z.string(),
   last_progress_at: z.string().nullable().optional(),
@@ -1572,7 +1596,7 @@ export const readingGoalCreateRequestSchema = z.object({
   period_end: z.string(),
   period_start: z.string(),
   scope: readingGoalScopeSchema.optional(),
-  target_metadata: z.record(z.unknown()).optional(),
+  target_metadata: z.record(z.string(), z.unknown()).optional(),
   target_value: z.number(),
   timezone: z.string().optional(),
 });
@@ -1586,7 +1610,7 @@ export const readingGoalResponseSchema = z.object({
   period_start: z.string(),
   scope: readingGoalScopeSchema,
   status: readingGoalStatusSchema,
-  target_metadata: z.record(z.unknown()),
+  target_metadata: z.record(z.string(), z.unknown()),
   target_value: z.number(),
   timezone: z.string(),
 });
@@ -1602,20 +1626,20 @@ export const readingStatisticRecomputeRequestSchema = z.object({
 });
 
 export const readingStatisticResponseSchema = z.object({
-  authors: z.record(z.number()),
+  authors: z.record(z.string(), z.number()),
   books_completed: z.number(),
   computed_at: z.string(),
-  genres: z.record(z.number()),
+  genres: z.record(z.string(), z.number()),
   id: z.string(),
   minutes_read: z.number(),
-  monthly_progress: z.record(z.unknown()),
+  monthly_progress: z.record(z.string(), z.unknown()),
   pages_read: z.number(),
   period_end: z.string(),
   period_start: z.string(),
   period_type: readingStatisticPeriodSchema,
   reading_streak_days: z.number(),
   timezone: z.string(),
-  year_summary: z.record(z.unknown()),
+  year_summary: z.record(z.string(), z.unknown()),
 });
 
 export const readingStatisticListResponseSchema = z.object({

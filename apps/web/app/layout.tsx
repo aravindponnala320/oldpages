@@ -1,4 +1,5 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import { connection } from "next/server";
 
 import "./globals.css";
 import { QueryProvider } from "../contexts/QueryProvider";
@@ -12,9 +13,18 @@ export const metadata: Metadata = {
   title: "OldPages",
 };
 
-export default function RootLayout({
+// viewport-fit=cover lets the bottom nav pad itself clear of the iPhone home indicator.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
+
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  // Render per request: a page built ahead of time couldn't carry the request's CSP nonce.
+  await connection();
   return (
     <html lang="en">
       <body>

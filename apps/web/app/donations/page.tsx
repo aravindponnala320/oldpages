@@ -43,7 +43,8 @@ export default function DonationsPage() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(3, 1fr)",
+            gridTemplateColumns:
+              "repeat(auto-fit, minmax(min(100%, 260px), 1fr))",
             gap: 16,
             marginBottom: 24,
           }}
@@ -54,7 +55,9 @@ export default function DonationsPage() {
         </div>
 
         {loading ? (
-          <div style={{ display: "flex", justifyContent: "center", padding: 40 }}>
+          <div
+            style={{ display: "flex", justifyContent: "center", padding: 40 }}
+          >
             <Spinner size="md" />
           </div>
         ) : (
@@ -62,7 +65,11 @@ export default function DonationsPage() {
             icon={<Icon.heart size={26} color={colors.primary} />}
             title="No campaigns available yet"
             description="Donation campaigns will appear here as soon as the campaign API endpoint is available. In the meantime, you can browse listings to donate directly to individual sellers."
-            action={<LinkButton href="/search?listing_mode=donate">Browse Donation Listings</LinkButton>}
+            action={
+              <LinkButton href="/search?listing_mode=donate">
+                Browse Donation Listings
+              </LinkButton>
+            }
           />
         )}
       </Container>
@@ -81,10 +88,24 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
         boxShadow: shadow.sm,
       }}
     >
-      <div style={{ fontSize: font.size["2xl"], fontWeight: font.weight.heavy, color: colors.text }}>
+      <div
+        style={{
+          fontSize: font.size["2xl"],
+          fontWeight: font.weight.heavy,
+          color: colors.text,
+        }}
+      >
         {value}
       </div>
-      <div style={{ fontSize: font.size.sm, color: colors.textSubtle, marginTop: 4 }}>{label}</div>
+      <div
+        style={{
+          fontSize: font.size.sm,
+          color: colors.textSubtle,
+          marginTop: 4,
+        }}
+      >
+        {label}
+      </div>
     </div>
   );
 }

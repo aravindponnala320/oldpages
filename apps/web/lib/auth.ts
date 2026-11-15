@@ -26,3 +26,13 @@ export function clearTokens(): void {
 export function isAuthenticated(): boolean {
   return !!getAccessToken();
 }
+
+// Public user id (not a secret) for server-rendered pages, e.g. search hides your own books.
+export const VIEWER_COOKIE = "op_uid";
+
+export function setViewerCookie(userId: string | null): void {
+  if (typeof document === "undefined") return;
+  document.cookie = userId
+    ? `${VIEWER_COOKIE}=${encodeURIComponent(userId)}; Path=/; Max-Age=${60 * 60 * 24 * 30}; SameSite=Lax`
+    : `${VIEWER_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`;
+}

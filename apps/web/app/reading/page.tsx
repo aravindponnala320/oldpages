@@ -60,7 +60,14 @@ export default function ReadingPage() {
 
   if (isLoading) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: "60vh",
+        }}
+      >
         <Spinner size="lg" />
       </div>
     );
@@ -101,7 +108,8 @@ export default function ReadingPage() {
 function ShelvesTab() {
   const [shelves, setShelves] = useState<ReadingShelfResponse[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedShelf, setSelectedShelf] = useState<ReadingShelfResponse | null>(null);
+  const [selectedShelf, setSelectedShelf] =
+    useState<ReadingShelfResponse | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -125,10 +133,22 @@ function ShelvesTab() {
   if (selectedShelf) {
     return (
       <div>
-        <Button variant="ghost" size="sm" onClick={() => setSelectedShelf(null)} style={{ marginBottom: 12 }}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setSelectedShelf(null)}
+          style={{ marginBottom: 12 }}
+        >
           ← Back to Shelves
         </Button>
-        <h2 style={{ margin: "0 0 20px", fontSize: font.size.xl, fontWeight: font.weight.bold, color: colors.text }}>
+        <h2
+          style={{
+            margin: "0 0 20px",
+            fontSize: font.size.xl,
+            fontWeight: font.weight.bold,
+            color: colors.text,
+          }}
+        >
           {SHELF_EMOJI[selectedShelf.shelf_type] ?? "📂"} {selectedShelf.name}
         </h2>
         {selectedShelf.items.length === 0 ? (
@@ -137,7 +157,14 @@ function ShelvesTab() {
             title="No books on this shelf yet"
           />
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 14 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns:
+                "repeat(auto-fill, minmax(min(100%, 200px), 1fr))",
+              gap: 14,
+            }}
+          >
             {selectedShelf.items.map((item) => (
               <div
                 key={item.id}
@@ -162,14 +189,37 @@ function ShelvesTab() {
                 >
                   <Icon.book size={28} color={colors.textFaint} />
                 </div>
-                <p style={{ margin: "0 0 2px", fontWeight: font.weight.semibold, fontSize: font.size.base, color: colors.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <p
+                  style={{
+                    margin: "0 0 2px",
+                    fontWeight: font.weight.semibold,
+                    fontSize: font.size.base,
+                    color: colors.text,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
                   {item.book.title}
                 </p>
-                <p style={{ margin: 0, fontSize: font.size.sm, color: colors.textSubtle }}>
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: font.size.sm,
+                    color: colors.textSubtle,
+                  }}
+                >
                   {item.book.authors.join(", ")}
                 </p>
                 {item.note && (
-                  <p style={{ margin: "6px 0 0", fontSize: font.size.sm, color: colors.textFaint, fontStyle: "italic" }}>
+                  <p
+                    style={{
+                      margin: "6px 0 0",
+                      fontSize: font.size.sm,
+                      color: colors.textFaint,
+                      fontStyle: "italic",
+                    }}
+                  >
                     {item.note}
                   </p>
                 )}
@@ -188,7 +238,13 @@ function ShelvesTab() {
       description="Start adding books to track your reading!"
     />
   ) : (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 14 }}>
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 240px), 1fr))",
+        gap: 14,
+      }}
+    >
       {shelves.map((shelf) => (
         <button
           key={shelf.id}
@@ -205,11 +261,26 @@ function ShelvesTab() {
             boxShadow: shadow.sm,
           }}
         >
-          <div style={{ fontSize: 32, marginBottom: 8 }}>{SHELF_EMOJI[shelf.shelf_type] ?? "📂"}</div>
-          <p style={{ margin: 0, fontWeight: font.weight.bold, color: colors.text, fontSize: font.size.md }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>
+            {SHELF_EMOJI[shelf.shelf_type] ?? "📂"}
+          </div>
+          <p
+            style={{
+              margin: 0,
+              fontWeight: font.weight.bold,
+              color: colors.text,
+              fontSize: font.size.md,
+            }}
+          >
             {shelf.name}
           </p>
-          <p style={{ margin: "3px 0 0", fontSize: font.size.sm, color: colors.textSubtle }}>
+          <p
+            style={{
+              margin: "3px 0 0",
+              fontSize: font.size.sm,
+              color: colors.textSubtle,
+            }}
+          >
             {shelf.items.length} {shelf.items.length === 1 ? "book" : "books"}
           </p>
           {!shelf.is_system && (
@@ -270,7 +341,10 @@ function GoalsTab() {
       setShowCreate(false);
       toast("Goal created", "success");
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Failed to create goal", "error");
+      toast(
+        err instanceof Error ? err.message : "Failed to create goal",
+        "error",
+      );
     } finally {
       setCreating(false);
     }
@@ -285,15 +359,36 @@ function GoalsTab() {
   }
 
   const progressPct = (g: ReadingGoalResponse) =>
-    g.target_value === 0 ? 0 : Math.min(100, Math.round((g.current_value / g.target_value) * 100));
+    g.target_value === 0
+      ? 0
+      : Math.min(100, Math.round((g.current_value / g.target_value) * 100));
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-        <h2 style={{ margin: 0, fontSize: font.size.lg, fontWeight: font.weight.bold, color: colors.text }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 16,
+        }}
+      >
+        <h2
+          style={{
+            margin: 0,
+            fontSize: font.size.lg,
+            fontWeight: font.weight.bold,
+            color: colors.text,
+          }}
+        >
           Reading Goals
         </h2>
-        <Button variant="primary" size="sm" onClick={() => setShowCreate(true)} leftIcon={<Icon.plus size={14} />}>
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={() => setShowCreate(true)}
+          leftIcon={<Icon.plus size={14} />}
+        >
           New Goal
         </Button>
       </div>
@@ -318,24 +413,69 @@ function GoalsTab() {
                   padding: 18,
                 }}
               >
-                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 12 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    justifyContent: "space-between",
+                    marginBottom: 12,
+                  }}
+                >
                   <div>
-                    <p style={{ margin: 0, fontWeight: font.weight.bold, color: colors.text, fontSize: font.size.md }}>
-                      {goal.goal_type.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+                    <p
+                      style={{
+                        margin: 0,
+                        fontWeight: font.weight.bold,
+                        color: colors.text,
+                        fontSize: font.size.md,
+                      }}
+                    >
+                      {goal.goal_type
+                        .replace(/_/g, " ")
+                        .replace(/\b\w/g, (c) => c.toUpperCase())}
                     </p>
-                    <p style={{ margin: "3px 0 0", fontSize: font.size.sm, color: colors.textFaint }}>
+                    <p
+                      style={{
+                        margin: "3px 0 0",
+                        fontSize: font.size.sm,
+                        color: colors.textFaint,
+                      }}
+                    >
                       {new Date(goal.period_start).toLocaleDateString()} –{" "}
                       {new Date(goal.period_end).toLocaleDateString()}
                     </p>
                   </div>
                   <Badge
-                    variant={goal.status === "completed" ? "success" : goal.status === "cancelled" ? "danger" : "info"}
+                    variant={
+                      goal.status === "completed"
+                        ? "success"
+                        : goal.status === "cancelled"
+                          ? "danger"
+                          : "info"
+                    }
                     label={goal.status}
                   />
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: font.size.sm, color: colors.textSubtle, marginBottom: 6 }}>
-                  <span>{goal.current_value} / {goal.target_value}</span>
-                  <span style={{ fontWeight: font.weight.semibold, color: colors.primary }}>{pct}%</span>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    fontSize: font.size.sm,
+                    color: colors.textSubtle,
+                    marginBottom: 6,
+                  }}
+                >
+                  <span>
+                    {goal.current_value} / {goal.target_value}
+                  </span>
+                  <span
+                    style={{
+                      fontWeight: font.weight.semibold,
+                      color: colors.primary,
+                    }}
+                  >
+                    {pct}%
+                  </span>
                 </div>
                 <ProgressBar pct={pct} />
               </div>
@@ -350,8 +490,16 @@ function GoalsTab() {
         title="Create Reading Goal"
         footer={
           <>
-            <Button variant="secondary" onClick={() => setShowCreate(false)} disabled={creating}>Cancel</Button>
-            <Button variant="primary" loading={creating} onClick={handleCreate}>Create Goal</Button>
+            <Button
+              variant="secondary"
+              onClick={() => setShowCreate(false)}
+              disabled={creating}
+            >
+              Cancel
+            </Button>
+            <Button variant="primary" loading={creating} onClick={handleCreate}>
+              Create Goal
+            </Button>
           </>
         }
       >
@@ -359,7 +507,13 @@ function GoalsTab() {
           <Select
             label="Goal Type"
             value={form.goal_type}
-            onChange={(e) => setForm({ ...form, goal_type: e.target.value as ReadingGoalCreateRequest["goal_type"] })}
+            onChange={(e) =>
+              setForm({
+                ...form,
+                goal_type: e.target
+                  .value as ReadingGoalCreateRequest["goal_type"],
+              })
+            }
             options={[
               { value: "books_per_year", label: "Books per Year" },
               { value: "pages_per_month", label: "Pages per Month" },
@@ -376,12 +530,21 @@ function GoalsTab() {
             value={form.target_value}
             onChange={(e) => setForm({ ...form, target_value: e.target.value })}
           />
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns:
+                "repeat(auto-fit, minmax(min(100%, 200px), 1fr))",
+              gap: 10,
+            }}
+          >
             <Input
               label="Start Date"
               type="date"
               value={form.period_start}
-              onChange={(e) => setForm({ ...form, period_start: e.target.value })}
+              onChange={(e) =>
+                setForm({ ...form, period_start: e.target.value })
+              }
             />
             <Input
               label="End Date"
@@ -430,15 +593,28 @@ function StatsTab() {
     );
   }
 
-  const topGenres = Object.entries(latest.genres).sort(([, a], [, b]) => b - a).slice(0, 5);
+  const topGenres = Object.entries(latest.genres)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 5);
 
   return (
     <div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns:
+            "repeat(auto-fit, minmax(min(100%, 150px), 1fr))",
+          gap: 12,
+          marginBottom: 20,
+        }}
+      >
         {[
           { label: "Books Completed", value: latest.books_completed },
           { label: "Pages Read", value: latest.pages_read.toLocaleString() },
-          { label: "Minutes Read", value: latest.minutes_read.toLocaleString() },
+          {
+            label: "Minutes Read",
+            value: latest.minutes_read.toLocaleString(),
+          },
           { label: "Reading Streak", value: `${latest.reading_streak_days}d` },
         ].map((s) => (
           <div
@@ -451,10 +627,24 @@ function StatsTab() {
               boxShadow: shadow.sm,
             }}
           >
-            <div style={{ fontSize: font.size["2xl"], fontWeight: font.weight.heavy, color: colors.text }}>
+            <div
+              style={{
+                fontSize: font.size["2xl"],
+                fontWeight: font.weight.heavy,
+                color: colors.text,
+              }}
+            >
               {s.value}
             </div>
-            <div style={{ fontSize: font.size.sm, color: colors.textSubtle, marginTop: 4 }}>{s.label}</div>
+            <div
+              style={{
+                fontSize: font.size.sm,
+                color: colors.textSubtle,
+                marginTop: 4,
+              }}
+            >
+              {s.label}
+            </div>
           </div>
         ))}
       </div>
@@ -467,9 +657,19 @@ function StatsTab() {
               const pct = Math.round((count / max) * 100);
               return (
                 <div key={genre}>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: font.size.sm, color: colors.textMuted, marginBottom: 4 }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      fontSize: font.size.sm,
+                      color: colors.textMuted,
+                      marginBottom: 4,
+                    }}
+                  >
                     <span>{genre}</span>
-                    <span style={{ color: colors.textSubtle }}>{count} books</span>
+                    <span style={{ color: colors.textSubtle }}>
+                      {count} books
+                    </span>
                   </div>
                   <ProgressBar pct={pct} />
                 </div>
@@ -487,7 +687,11 @@ function NotesTab() {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  const NOTE_ICONS: Record<string, string> = { note: "📝", highlight: "🖊️", quote: "💬" };
+  const NOTE_ICONS: Record<string, string> = {
+    note: "📝",
+    highlight: "🖊️",
+    quote: "💬",
+  };
 
   useEffect(() => {
     const token = getAccessToken();
@@ -525,18 +729,52 @@ function NotesTab() {
             padding: 16,
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 18 }}>{NOTE_ICONS[note.note_type] ?? "📝"}</span>
-            <span style={{ fontWeight: font.weight.semibold, fontSize: font.size.base, color: colors.text }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              marginBottom: 8,
+              flexWrap: "wrap",
+            }}
+          >
+            <span style={{ fontSize: 18 }}>
+              {NOTE_ICONS[note.note_type] ?? "📝"}
+            </span>
+            <span
+              style={{
+                fontWeight: font.weight.semibold,
+                fontSize: font.size.base,
+                color: colors.text,
+              }}
+            >
               {note.book.title}
             </span>
             <Badge label={note.note_type} />
-            {note.page_number && <span style={{ color: colors.textFaint, fontSize: font.size.xs }}>p. {note.page_number}</span>}
+            {note.page_number && (
+              <span style={{ color: colors.textFaint, fontSize: font.size.xs }}>
+                p. {note.page_number}
+              </span>
+            )}
           </div>
-          <p style={{ margin: 0, lineHeight: font.lineHeight.relaxed, color: colors.textMuted, fontStyle: note.note_type === "quote" ? "italic" : "normal", fontSize: font.size.base }}>
+          <p
+            style={{
+              margin: 0,
+              lineHeight: font.lineHeight.relaxed,
+              color: colors.textMuted,
+              fontStyle: note.note_type === "quote" ? "italic" : "normal",
+              fontSize: font.size.base,
+            }}
+          >
             {note.note_type === "quote" ? `"${note.body}"` : note.body}
           </p>
-          <p style={{ margin: "8px 0 0", fontSize: font.size.xs, color: colors.textFaint }}>
+          <p
+            style={{
+              margin: "8px 0 0",
+              fontSize: font.size.xs,
+              color: colors.textFaint,
+            }}
+          >
             {new Date(note.created_at).toLocaleDateString()}
           </p>
         </div>
@@ -547,7 +785,14 @@ function NotesTab() {
 
 function ProgressBar({ pct }: { pct: number }) {
   return (
-    <div style={{ background: colors.divider, borderRadius: radius.pill, height: 8, overflow: "hidden" }}>
+    <div
+      style={{
+        background: colors.divider,
+        borderRadius: radius.pill,
+        height: 8,
+        overflow: "hidden",
+      }}
+    >
       <div
         style={{
           height: "100%",

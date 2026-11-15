@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from conftest import RegisterUser
-from oldpages_api.commerce.models import Offer
+from oldpages_api.commerce.models import Offer, Transaction
 from oldpages_api.identity.security import utc_now
 
 
@@ -215,6 +215,67 @@ async def test_counter_reject_and_withdraw_offer_flow(
     assert withdraw.json()["status"] == "withdrawn"
 
 
+@pytest.mark.asyncio
+async def test_offer_uses_listing_currency_not_client_default(
+    client: AsyncClient,
+    register_user: RegisterUser,
+) -> None:
+    seller = await register_user(client, email="seller-usd@example.com", username="seller-usd")
+    buyer = await register_user(client, email="buyer-usd@example.com", username="buyer-usd")
+    listing = await create_published_listing(
+        client, seller["tokens"]["access_token"], title="New York Book", country="US"
+    )
+    assert listing["currency"] == "USD"
+
+    # The client sends nothing (the schema default is INR); the listing decides.
+    offer = await create_offer(
+        client, buyer["tokens"]["access_token"], listing["id"], amount_cents=1500
+    )
+
+    assert offer["currency"] == "USD"
+
+
+@pytest.mark.asyncio
+async def test_a_second_racing_accept_is_a_conflict_not_a_server_error(
+    client: AsyncClient,
+    register_user: RegisterUser,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    seller = await register_user(client, email="seller-race@example.com", username="seller-race")
+    buyer = await register_user(client, email="buyer-race@example.com", username="buyer-race")
+    seller_token = seller["tokens"]["access_token"]
+    listing = await create_published_listing(client, seller_token, title="Race", quantity=2)
+    offer = await create_offer(
+        client, buyer["tokens"]["access_token"], listing["id"], amount_cents=30000
+    )
+    # The other accept already committed its transaction; this one still saw "pending".
+    async with session_factory() as session:
+        offer_model = (
+            await session.execute(select(Offer).where(Offer.public_id == offer["id"]))
+        ).scalar_one()
+        session.add(
+            Transaction(
+                amount_cents=offer_model.amount_cents,
+                accepted_at=utc_now(),
+                buyer_user_id=offer_model.buyer_user_id,
+                currency=offer_model.currency,
+                fulfillment_method=offer_model.fulfillment_method,
+                listing_id=offer_model.listing_id,
+                offer_id=offer_model.id,
+                quantity=1,
+                seller_user_id=offer_model.seller_user_id,
+                status="reserved",
+            )
+        )
+        await session.commit()
+
+    response = await client.post(
+        f"/api/v1/offers/{offer['id']}/accept", headers=auth(seller_token), json={}
+    )
+
+    assert response.status_code == 409, response.text
+
+
 async def create_offer(
     client: AsyncClient,
     token: str,
@@ -242,14 +303,13 @@ async def create_published_listing(
     *,
     title: str,
     quantity: int = 1,
+    country: str = "IN",
 ) -> dict[str, Any]:
     book = await create_book(client, token, title=title)
     media = await upload_media(client, token)
-    create_response = await client.post(
-        "/api/v1/listings",
-        headers=auth(token),
-        json=listing_payload(book_id=book["id"], image_id=media["id"], quantity=quantity),
-    )
+    payload = listing_payload(book_id=book["id"], image_id=media["id"], quantity=quantity)
+    payload["location"]["country"] = country
+    create_response = await client.post("/api/v1/listings", headers=auth(token), json=payload)
     assert create_response.status_code == 201, create_response.text
     publish_response = await client.post(
         f"/api/v1/listings/{create_response.json()['id']}/publish",

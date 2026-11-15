@@ -36,6 +36,7 @@ class ListingSearchFilters(BaseModel):
     condition: ConditionGrade | None = None
     country: str | None = Field(default=None, max_length=80)
     cursor: str | None = Field(default=None, max_length=256)
+    currency: str | None = Field(default=None, min_length=3, max_length=3)  # pairs with price
     delivery_method: DeliveryMethod | None = None
     distance_km: float | None = Field(default=None, gt=0, le=500)
     first_edition: bool | None = None
@@ -46,6 +47,11 @@ class ListingSearchFilters(BaseModel):
     latitude: float | None = Field(default=None, ge=-90, le=90)
     limit: int = Field(default=20, ge=1, le=50)
     listing_mode: ListingMode | None = None
+    excluded_modes: list[str] = Field(default_factory=list)  # listings with any of these are hidden
+    exclude_seller_id: str | None = Field(
+        default=None, max_length=64
+    )  # hide the reader's own books
+    seller_id: str | None = Field(default=None, max_length=64)  # one seller's shelf
     longitude: float | None = Field(default=None, ge=-180, le=180)
     max_price_amount_cents: int | None = Field(default=None, ge=0)
     min_price_amount_cents: int | None = Field(default=None, ge=0)

@@ -32,9 +32,13 @@ type Tab = "received" | "sent";
  * conversation. Until an aggregate endpoint ships, this returns [] so the page
  * shows a proper empty state instead of dummy rows.
  */
-async function fetchOffers(_token: string): Promise<OfferResponse[]> { return []; }
+async function fetchOffers(_token: string): Promise<OfferResponse[]> {
+  return [];
+}
 
-function statusVariant(status: OfferStatus): "warning" | "success" | "danger" | "default" {
+function statusVariant(
+  status: OfferStatus,
+): "warning" | "success" | "danger" | "default" {
   if (status === "pending" || status === "countered") return "warning";
   if (status === "accepted") return "success";
   if (status === "rejected") return "danger";
@@ -43,8 +47,12 @@ function statusVariant(status: OfferStatus): "warning" | "success" | "danger" | 
 
 function statusLabel(status: OfferStatus): string {
   const map: Record<OfferStatus, string> = {
-    pending: "Pending", countered: "Countered", accepted: "Accepted",
-    rejected: "Declined", withdrawn: "Withdrawn", expired: "Expired",
+    pending: "Pending",
+    countered: "Countered",
+    accepted: "Accepted",
+    rejected: "Declined",
+    withdrawn: "Withdrawn",
+    expired: "Expired",
   };
   return map[status] ?? status;
 }
@@ -59,7 +67,11 @@ export default function OffersPage() {
   const [tab, setTab] = useState<Tab>("received");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  const [counterModal, setCounterModal] = useState<{ offerId: string; current?: number; currency: string } | null>(null);
+  const [counterModal, setCounterModal] = useState<{
+    offerId: string;
+    current?: number;
+    currency: string;
+  } | null>(null);
   const [counterAmount, setCounterAmount] = useState("");
   const [counterMsg, setCounterMsg] = useState("");
   const [counterLoading, setCounterLoading] = useState(false);
@@ -140,10 +152,16 @@ export default function OffersPage() {
     try {
       const result = await apiClient.counterOffer(
         counterModal.offerId,
-        { amount_cents: amountCents, currency: counterModal.currency, message: counterMsg || null },
+        {
+          amount_cents: amountCents,
+          currency: counterModal.currency,
+          message: counterMsg || null,
+        },
         token,
       );
-      setOffers((prev) => prev.map((o) => (o.id === counterModal.offerId ? result : o)));
+      setOffers((prev) =>
+        prev.map((o) => (o.id === counterModal.offerId ? result : o)),
+      );
       setCounterModal(null);
       setCounterAmount("");
       setCounterMsg("");
@@ -157,7 +175,14 @@ export default function OffersPage() {
 
   if (isLoading) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: "60vh",
+        }}
+      >
         <Spinner size="lg" />
       </div>
     );
@@ -177,7 +202,7 @@ export default function OffersPage() {
           <Tabs
             tabs={[
               { key: "received", label: "Received", count: received.length },
-              { key: "sent",     label: "Sent",     count: sent.length },
+              { key: "sent", label: "Sent", count: sent.length },
             ]}
             value={tab}
             onChange={(k) => setTab(k as Tab)}
@@ -185,7 +210,9 @@ export default function OffersPage() {
         </div>
 
         {loading && (
-          <div style={{ display: "flex", justifyContent: "center", padding: 40 }}>
+          <div
+            style={{ display: "flex", justifyContent: "center", padding: 40 }}
+          >
             <Spinner size="md" />
           </div>
         )}
@@ -207,7 +234,8 @@ export default function OffersPage() {
             const isActing = actionLoading === offer.id;
             const isPending = offer.status === "pending";
             const isAccepted = offer.status === "accepted";
-            const counterpartyId = tab === "received" ? offer.buyer.id : offer.seller.id;
+            const counterpartyId =
+              tab === "received" ? offer.buyer.id : offer.seller.id;
             return (
               <div
                 key={offer.id}
@@ -218,50 +246,143 @@ export default function OffersPage() {
                   padding: 18,
                 }}
               >
-                <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
-                  <div style={{ width: 48, height: 64, background: colors.surfaceMuted, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <div
+                  style={{ display: "flex", alignItems: "flex-start", gap: 14 }}
+                >
+                  <div
+                    style={{
+                      width: 48,
+                      height: 64,
+                      background: colors.surfaceMuted,
+                      borderRadius: 6,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                    }}
+                  >
                     <Icon.book size={22} color={colors.textFaint} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
-                      <span style={{ fontWeight: font.weight.semibold, fontSize: font.size.base, color: colors.text }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        marginBottom: 6,
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontWeight: font.weight.semibold,
+                          fontSize: font.size.base,
+                          color: colors.text,
+                        }}
+                      >
                         Listing {offer.listing_id.slice(0, 8)}…
                       </span>
-                      <Badge variant={statusVariant(offer.status)} label={statusLabel(offer.status)} />
+                      <Badge
+                        variant={statusVariant(offer.status)}
+                        label={statusLabel(offer.status)}
+                      />
                     </div>
-                    <p style={{ margin: 0, fontSize: font.size["2xl"], fontWeight: font.weight.heavy, color: colors.text, letterSpacing: "-0.02em" }}>
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: font.size["2xl"],
+                        fontWeight: font.weight.heavy,
+                        color: colors.text,
+                        letterSpacing: "-0.02em",
+                      }}
+                    >
                       {formatPrice(offer.amount_cents, offer.currency)}
                     </p>
-                    <p style={{ margin: "4px 0 0", fontSize: font.size.xs, color: colors.textFaint }}>
-                      {tab === "received" ? "From" : "To"}: User {counterpartyId.slice(0, 6)} · {new Date(offer.created_at).toLocaleDateString()}
+                    <p
+                      style={{
+                        margin: "4px 0 0",
+                        fontSize: font.size.xs,
+                        color: colors.textFaint,
+                      }}
+                    >
+                      {tab === "received" ? "From" : "To"}: User{" "}
+                      {counterpartyId.slice(0, 6)} ·{" "}
+                      {new Date(offer.created_at).toLocaleDateString()}
                     </p>
                     {offer.message && (
-                      <p style={{ margin: "8px 0 0", fontSize: font.size.base, color: colors.textSubtle, fontStyle: "italic" }}>
+                      <p
+                        style={{
+                          margin: "8px 0 0",
+                          fontSize: font.size.base,
+                          color: colors.textSubtle,
+                          fontStyle: "italic",
+                        }}
+                      >
                         &ldquo;{offer.message}&rdquo;
                       </p>
                     )}
                   </div>
                 </div>
 
-                <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 8,
+                    marginTop: 14,
+                    flexWrap: "wrap",
+                  }}
+                >
                   {tab === "received" && isPending && (
                     <>
-                      <Button variant="primary" size="sm" loading={isActing} onClick={() => setAcceptModal(offer.id)}>Accept</Button>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        loading={isActing}
+                        onClick={() => setAcceptModal(offer.id)}
+                      >
+                        Accept
+                      </Button>
                       <Button
                         variant="secondary"
                         size="sm"
-                        onClick={() => setCounterModal({ offerId: offer.id, current: offer.amount_cents ?? undefined, currency: offer.currency })}
+                        onClick={() =>
+                          setCounterModal({
+                            offerId: offer.id,
+                            current: offer.amount_cents ?? undefined,
+                            currency: offer.currency,
+                          })
+                        }
                       >
                         Counter
                       </Button>
-                      <Button variant="danger" size="sm" loading={isActing} onClick={() => handleReject(offer.id)}>Decline</Button>
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        loading={isActing}
+                        onClick={() => handleReject(offer.id)}
+                      >
+                        Decline
+                      </Button>
                     </>
                   )}
                   {tab === "sent" && isPending && (
-                    <Button variant="danger" size="sm" loading={isActing} onClick={() => handleWithdraw(offer.id)}>Withdraw</Button>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      loading={isActing}
+                      onClick={() => handleWithdraw(offer.id)}
+                    >
+                      Withdraw
+                    </Button>
                   )}
                   {isAccepted && offer.transaction_id && (
-                    <Button variant="primary" size="sm" onClick={() => router.push(`/orders/${offer.transaction_id}`)}>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() =>
+                        router.push(`/orders/${offer.transaction_id}`)
+                      }
+                    >
                       View Order
                     </Button>
                   )}
@@ -273,22 +394,55 @@ export default function OffersPage() {
 
         <Modal
           isOpen={!!counterModal}
-          onClose={() => { setCounterModal(null); setCounterAmount(""); setCounterMsg(""); }}
+          onClose={() => {
+            setCounterModal(null);
+            setCounterAmount("");
+            setCounterMsg("");
+          }}
           title="Counter Offer"
           footer={
             <>
-              <Button variant="secondary" onClick={() => setCounterModal(null)}>Cancel</Button>
-              <Button variant="primary" loading={counterLoading} onClick={handleCounter}>Send Counter</Button>
+              <Button variant="secondary" onClick={() => setCounterModal(null)}>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                loading={counterLoading}
+                onClick={handleCounter}
+              >
+                Send Counter
+              </Button>
             </>
           }
         >
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {counterModal?.current && (
-              <div style={{ background: colors.surfaceMuted, borderRadius: radius.lg, padding: 12 }}>
-                <p style={{ margin: "0 0 4px", fontSize: font.size.xs, fontWeight: font.weight.bold, color: colors.textFaint, textTransform: "uppercase" }}>
+              <div
+                style={{
+                  background: colors.surfaceMuted,
+                  borderRadius: radius.lg,
+                  padding: 12,
+                }}
+              >
+                <p
+                  style={{
+                    margin: "0 0 4px",
+                    fontSize: font.size.xs,
+                    fontWeight: font.weight.bold,
+                    color: colors.textFaint,
+                    textTransform: "uppercase",
+                  }}
+                >
                   Their offer
                 </p>
-                <p style={{ margin: 0, fontWeight: font.weight.bold, color: colors.text, fontSize: font.size.lg }}>
+                <p
+                  style={{
+                    margin: 0,
+                    fontWeight: font.weight.bold,
+                    color: colors.text,
+                    fontSize: font.size.lg,
+                  }}
+                >
                   {formatPrice(counterModal.current, counterModal.currency)}
                 </p>
               </div>
@@ -316,15 +470,22 @@ export default function OffersPage() {
           title="Accept Offer"
           footer={
             <>
-              <Button variant="secondary" onClick={() => setAcceptModal(null)}>Cancel</Button>
-              <Button variant="primary" loading={actionLoading === acceptModal} onClick={() => acceptModal && handleAccept(acceptModal)}>
+              <Button variant="secondary" onClick={() => setAcceptModal(null)}>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                loading={actionLoading === acceptModal}
+                onClick={() => acceptModal && handleAccept(acceptModal)}
+              >
                 Yes, Accept
               </Button>
             </>
           }
         >
           <p style={{ margin: 0, lineHeight: 1.6, color: colors.text }}>
-            Are you sure you want to accept this offer? This will create an order that you need to fulfill.
+            Are you sure you want to accept this offer? This will create an
+            order that you need to fulfill.
           </p>
         </Modal>
       </Container>

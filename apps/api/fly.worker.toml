@@ -6,9 +6,12 @@ primary_region = "sin"
 
 [env]
   OLDPAGES_ENVIRONMENT = "production"
+  OLDPAGES_PUBLIC_WEB_URL = "https://oldpages.in"
+  OLDPAGES_CLIENT_IP_HEADER = "Fly-Client-IP"
   OLDPAGES_OTEL_ENABLED = "false"
   OLDPAGES_DEBUG = "false"
   OLDPAGES_LOG_LEVEL = "INFO"
+  OLDPAGES_EXPOSE_DEVELOPMENT_AUTH_TOKENS = "false"
 
 [processes]
   worker = "python -m oldpages_api.worker"

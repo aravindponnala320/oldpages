@@ -5,11 +5,15 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from oldpages_api.identity.dependencies import CurrentPrincipal, get_current_principal, get_moderator_principal
+from oldpages_api.identity.dependencies import (
+    CurrentPrincipal,
+    get_current_principal,
+    get_moderator_principal,
+)
 from oldpages_api.institutions.schemas import (
     AddDomainRequest,
-    ApproveMemberRequest,
     ApprovalActionRequest,
+    ApproveMemberRequest,
     InstitutionCreateRequest,
     InstitutionDomainResponse,
     InstitutionListResponse,

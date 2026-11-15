@@ -31,14 +31,15 @@ class OAuthProviderVerifier:
         return self._verify_dev_only(provider, id_token, settings)
 
     async def _verify_google(self, id_token: str, settings: Settings) -> OAuthIdentity:
-        if settings.environment == "production" and not settings.google_client_id:
+        # Without a client id any Google token (minted for any app) would be accepted.
+        if settings.environment not in {"local", "test"} and not settings.google_client_id:
             raise ForbiddenIdentityActionError(
                 "Google OAuth is not configured for this environment."
             )
 
         # Dev-mode escape hatch (same format as before) so local tests keep working
         # without a real Google ID token.
-        if settings.environment != "production" and id_token.startswith("dev:google:"):
+        if settings.environment in {"local", "test"} and id_token.startswith("dev:google:"):
             return self._parse_dev_token("google", id_token)
 
         async with httpx.AsyncClient(timeout=10.0) as http:
@@ -71,9 +72,9 @@ class OAuthProviderVerifier:
         self, provider: OAuthProvider, id_token: str, settings: Settings
     ) -> OAuthIdentity:
         # Apple etc. not wired up yet. Fall back to the dev-token format for local testing.
-        if settings.environment == "production":
+        if settings.environment not in {"local", "test"}:
             raise ForbiddenIdentityActionError(
-                f"OAuth provider '{provider}' is not configured for production."
+                f"OAuth provider '{provider}' is not configured for {settings.environment}."
             )
         return self._parse_dev_token(provider, id_token)
 

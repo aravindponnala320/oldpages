@@ -16,7 +16,7 @@ type InputProps = {
   inputSize?: InputSize;
 } & Omit<InputHTMLAttributes<HTMLInputElement>, "size" | "prefix" | "suffix">;
 
-const heights: Record<InputSize, number> = { sm: 34, md: 40, lg: 46 };
+const heights: Record<InputSize, number> = { sm: 36, md: 44, lg: 48 };
 const pads: Record<InputSize, string> = {
   sm: "0 12px",
   md: "0 14px",
@@ -40,11 +40,22 @@ export function Input({
   const borderColor = error ? colors.danger : colors.borderStrong;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6, ...containerStyle }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 6,
+        ...containerStyle,
+      }}
+    >
       {label && (
         <label
           htmlFor={inputId}
-          style={{ fontSize: font.size.sm, fontWeight: font.weight.semibold, color: colors.textMuted }}
+          style={{
+            fontSize: font.size.sm,
+            fontWeight: font.weight.semibold,
+            color: colors.textMuted,
+          }}
         >
           {label}
         </label>
@@ -52,7 +63,7 @@ export function Input({
       <div
         style={{
           display: "flex",
-          alignItems: "center",
+          alignItems: "stretch",
           gap: 8,
           background: colors.surface,
           border: `1px solid ${borderColor}`,
@@ -63,13 +74,24 @@ export function Input({
         }}
       >
         {prefix && (
-          <span style={{ display: "flex", alignItems: "center", color: colors.textFaint }}>{prefix}</span>
+          <span
+            style={{
+              display: "flex",
+              alignItems: "center",
+              color: colors.textFaint,
+            }}
+          >
+            {prefix}
+          </span>
         )}
         <input
           id={inputId}
           {...rest}
           style={{
             flex: 1,
+            // Fill the whole box so the entire visible field is tappable.
+            height: "100%",
+            padding: 0,
             border: "none",
             outline: "none",
             background: "transparent",
@@ -81,13 +103,25 @@ export function Input({
           }}
         />
         {suffix && (
-          <span style={{ display: "flex", alignItems: "center", color: colors.textFaint }}>{suffix}</span>
+          <span
+            style={{
+              display: "flex",
+              alignItems: "center",
+              color: colors.textFaint,
+            }}
+          >
+            {suffix}
+          </span>
         )}
       </div>
       {error ? (
-        <span style={{ fontSize: font.size.sm, color: colors.danger }}>{error}</span>
+        <span style={{ fontSize: font.size.sm, color: colors.danger }}>
+          {error}
+        </span>
       ) : helperText ? (
-        <span style={{ fontSize: font.size.sm, color: colors.textSubtle }}>{helperText}</span>
+        <span style={{ fontSize: font.size.sm, color: colors.textSubtle }}>
+          {helperText}
+        </span>
       ) : null}
     </div>
   );

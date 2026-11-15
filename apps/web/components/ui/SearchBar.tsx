@@ -31,20 +31,23 @@ export function SearchBar({
       method="GET"
       style={{
         flex: 1,
+        minWidth: 0,
         maxWidth,
         display: "flex",
         alignItems: "center",
         background: colors.surface,
         border: `1px solid ${colors.borderStrong}`,
         borderRadius: radius.pill,
-        padding: "6px 6px 6px 20px",
-        gap: 10,
+        padding: "4px 4px 4px clamp(12px, 3vw, 20px)",
+        gap: 8,
         ...style,
       }}
     >
       <Icon.search color={colors.textFaint} />
       <input
-        type="text"
+        type="search"
+        enterKeyHint="search"
+        aria-label={placeholder}
         name={name}
         defaultValue={defaultValue}
         placeholder={placeholder}

@@ -19,7 +19,16 @@ import {
   radius,
   useToast,
 } from "../../../../components/ui";
-import type { ListingResponse, ConditionGrade, ListingUpdateRequest } from "@oldpages/shared-types";
+import type {
+  ListingResponse,
+  ConditionGrade,
+  ListingUpdateRequest,
+} from "@oldpages/shared-types";
+import type { LocationPayload } from "@oldpages/api-client";
+import { PlacePicker } from "../../../../components/PlacePicker";
+import { CategoryPicker } from "../../../../components/CategoryPicker";
+import { currencyForCountry } from "../../../../lib/currency";
+import { placeContext, shortLocationLabel } from "../../../../lib/geo";
 
 interface EditFormData {
   condition: ConditionGrade;
@@ -49,12 +58,12 @@ interface EditFormData {
 
 const CONDITIONS: { value: ConditionGrade; label: string }[] = [
   { value: "new_sealed", label: "New / Sealed" },
-  { value: "like_new",   label: "Like New" },
-  { value: "excellent",  label: "Excellent" },
-  { value: "very_good",  label: "Very Good" },
-  { value: "good",       label: "Good" },
+  { value: "like_new", label: "Like New" },
+  { value: "excellent", label: "Excellent" },
+  { value: "very_good", label: "Very Good" },
+  { value: "good", label: "Good" },
   { value: "acceptable", label: "Acceptable" },
-  { value: "poor",       label: "Poor" },
+  { value: "poor", label: "Poor" },
 ];
 
 export default function EditListingPage() {
@@ -68,21 +77,50 @@ export default function EditListingPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const { register, handleSubmit, reset, watch } = useForm<EditFormData>();
+  const { register, handleSubmit, reset, watch, setValue } =
+    useForm<EditFormData>();
+  // A newly picked location; until then the saved one (and its pickup point) is kept.
+  const [movedTo, setMovedTo] = useState<LocationPayload | null>(null);
+  const [changingPlace, setChangingPlace] = useState(false);
+  const [category, setCategory] = useState<string | null>(null);
+
+  function choosePlace(loc: LocationPayload) {
+    if (!loc.city) {
+      toast(
+        "We couldn't name that spot. Search for your area or use your PIN code.",
+        "error",
+      );
+      return;
+    }
+    setMovedTo(loc);
+    setValue("city", loc.city);
+    setValue("state", loc.state ?? "");
+    setValue("country", loc.country_code ?? "IN");
+    setValue("neighborhood", loc.locality ?? "");
+    setChangingPlace(false);
+  }
 
   useEffect(() => {
     async function loadListing() {
       const token = getAccessToken();
-      if (!token) { router.push("/login"); return; }
+      if (!token) {
+        router.push("/login");
+        return;
+      }
       try {
-        const data = await apiClient.getListing(listingId);
+        const data = await apiClient.getListing(listingId, token);
         setListing(data);
+        setCategory(data.category?.slug ?? null);
         const pickup = data.delivery_methods.find((d) => d.method === "pickup");
-        const shipping = data.delivery_methods.find((d) => d.method === "shipping");
+        const shipping = data.delivery_methods.find(
+          (d) => d.method === "shipping",
+        );
         reset({
           condition: data.condition?.condition ?? "good",
           handwritten_notes: data.condition?.handwritten_notes ?? false,
-          highlighting_percent: String(data.condition?.highlighting_percent ?? 0),
+          highlighting_percent: String(
+            data.condition?.highlighting_percent ?? 0,
+          ),
           torn_pages: data.condition?.torn_pages ?? false,
           water_damage: data.condition?.water_damage ?? false,
           stains: data.condition?.stains ?? false,
@@ -91,21 +129,29 @@ export default function EditListingPage() {
           missing_pages: data.condition?.missing_pages ?? false,
           name_written_inside: data.condition?.name_written_inside ?? false,
           damage_details: data.condition?.damage_details ?? "",
-          price: data.price_amount_cents != null ? String(data.price_amount_cents / 100) : "",
+          price:
+            data.price_amount_cents != null
+              ? String(data.price_amount_cents / 100)
+              : "",
           negotiable: data.negotiable,
           description: data.description ?? "",
           exchange_preferences: data.exchange_preferences ?? "",
           delivery_pickup: !!pickup?.enabled,
           delivery_shipping: !!shipping?.enabled,
-          shipping_price: shipping?.price_amount_cents != null ? String(shipping.price_amount_cents / 100) : "",
+          shipping_price:
+            shipping?.price_amount_cents != null
+              ? String(shipping.price_amount_cents / 100)
+              : "",
           city: data.location?.city ?? "",
           state: data.location?.state ?? "",
-          country: data.location?.country ?? "India",
+          country: data.location?.country ?? "IN",
           neighborhood: data.location?.neighborhood ?? "",
           campus_pickup: data.location?.campus_pickup ?? false,
         });
       } catch (err) {
-        setLoadError(err instanceof Error ? err.message : "Failed to load listing");
+        setLoadError(
+          err instanceof Error ? err.message : "Failed to load listing",
+        );
       } finally {
         setLoading(false);
       }
@@ -115,14 +161,20 @@ export default function EditListingPage() {
 
   async function onSubmit(data: EditFormData) {
     const token = getAccessToken();
-    if (!token) { router.push("/login"); return; }
+    if (!token) {
+      router.push("/login");
+      return;
+    }
     setSubmitting(true);
     try {
       const payload: ListingUpdateRequest = {
+        category,
         condition: {
           condition: data.condition,
           handwritten_notes: data.handwritten_notes,
-          highlighting_percent: data.highlighting_percent ? parseInt(data.highlighting_percent, 10) : null,
+          highlighting_percent: data.highlighting_percent
+            ? parseInt(data.highlighting_percent, 10)
+            : null,
           torn_pages: data.torn_pages,
           water_damage: data.water_damage,
           stains: data.stains,
@@ -132,19 +184,26 @@ export default function EditListingPage() {
           name_written_inside: data.name_written_inside,
           damage_details: data.damage_details || null,
         },
-        price_amount_cents: data.price ? Math.round(parseFloat(data.price) * 100) : null,
+        price_amount_cents: data.price
+          ? Math.round(parseFloat(data.price) * 100)
+          : null,
         negotiable: data.negotiable,
-        currency: "INR",
         description: data.description || null,
         exchange_preferences: data.exchange_preferences || null,
         delivery_methods: [
-          ...(data.delivery_pickup ? [{ method: "pickup" as const, enabled: true }] : []),
+          ...(data.delivery_pickup
+            ? [{ method: "pickup" as const, enabled: true }]
+            : []),
           ...(data.delivery_shipping
-            ? [{
-                method: "shipping" as const,
-                enabled: true,
-                price_amount_cents: data.shipping_price ? Math.round(parseFloat(data.shipping_price) * 100) : 0,
-              }]
+            ? [
+                {
+                  method: "shipping" as const,
+                  enabled: true,
+                  price_amount_cents: data.shipping_price
+                    ? Math.round(parseFloat(data.shipping_price) * 100)
+                    : 0,
+                },
+              ]
             : []),
         ],
         location: {
@@ -152,15 +211,24 @@ export default function EditListingPage() {
           state: data.state || null,
           country: data.country,
           neighborhood: data.neighborhood || null,
-          public_area: data.neighborhood || data.city,
+          public_area: [data.neighborhood, data.city, data.state]
+            .filter(Boolean)
+            .join(", "),
           campus_pickup: data.campus_pickup,
+          ...(movedTo && {
+            exact_latitude: String(movedTo.latitude),
+            exact_longitude: String(movedTo.longitude),
+          }),
         },
       };
       await apiClient.updateListing(listingId, payload, token);
       toast("Changes saved", "success");
       setTimeout(() => router.push(`/listings/${listingId}`), 800);
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Failed to save changes", "error");
+      toast(
+        err instanceof Error ? err.message : "Failed to save changes",
+        "error",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -168,7 +236,14 @@ export default function EditListingPage() {
 
   if (loading) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: "60vh",
+        }}
+      >
         <Spinner size="lg" />
       </div>
     );
@@ -178,22 +253,44 @@ export default function EditListingPage() {
     return (
       <div style={{ padding: "24px 0" }}>
         <Container maxWidth={800}>
-          <div style={{ background: colors.dangerSoft, border: `1px solid #fecaca`, color: colors.dangerText, borderRadius: radius.lg, padding: "14px 18px", marginBottom: 16 }}>
+          <div
+            style={{
+              background: colors.dangerSoft,
+              border: `1px solid #fecaca`,
+              color: colors.dangerText,
+              borderRadius: radius.lg,
+              padding: "14px 18px",
+              marginBottom: 16,
+            }}
+          >
             {loadError ?? "Listing not found"}
           </div>
-          <Button variant="ghost" onClick={() => router.back()}>← Back</Button>
+          <Button variant="ghost" onClick={() => router.back()}>
+            ← Back
+          </Button>
         </Container>
       </div>
     );
   }
 
+  // Moving the book to another country re-prices it in that country's currency (the API decides).
+  const currency = movedTo
+    ? currencyForCountry(movedTo.country_code)
+    : listing.currency;
   const showShipping = watch("delivery_shipping");
-  const showExchange = listing.listing_modes.includes("exchange") || listing.listing_modes.includes("sell_exchange");
+  const showExchange =
+    listing.listing_modes.includes("exchange") ||
+    listing.listing_modes.includes("sell_exchange");
 
   return (
     <div style={{ padding: "24px 0 40px" }}>
       <Container maxWidth={800}>
-        <Button variant="ghost" size="sm" onClick={() => router.back()} style={{ marginBottom: 12 }}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => router.back()}
+          style={{ marginBottom: 12 }}
+        >
           ← Back
         </Button>
         <PageHeader
@@ -202,13 +299,27 @@ export default function EditListingPage() {
           subtitle={listing.title}
         />
 
-        <form onSubmit={handleSubmit(onSubmit)} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <form
+          onSubmit={handleSubmit(onSubmit)}
+          style={{ display: "flex", flexDirection: "column", gap: 16 }}
+        >
+          <Section title="Category">
+            <CategoryPicker
+              value={category}
+              columns
+              onChange={(slug) => setCategory(slug)}
+            />
+          </Section>
+
           <Section title="Condition">
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <Select
                 label="Overall condition"
                 {...register("condition")}
-                options={CONDITIONS.map((c) => ({ value: c.value, label: c.label }))}
+                options={CONDITIONS.map((c) => ({
+                  value: c.value,
+                  label: c.label,
+                }))}
               />
               <Input
                 label="Highlighting (%)"
@@ -219,32 +330,54 @@ export default function EditListingPage() {
               />
               <div>
                 <p style={fieldLabel}>Condition flags</p>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8, marginTop: 8 }}>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns:
+                      "repeat(auto-fit, minmax(min(100%, 160px), 1fr))",
+                    gap: 8,
+                    marginTop: 8,
+                  }}
+                >
                   {[
-                    { name: "handwritten_notes" as const, label: "Handwritten notes" },
+                    {
+                      name: "handwritten_notes" as const,
+                      label: "Handwritten notes",
+                    },
                     { name: "torn_pages" as const, label: "Torn pages" },
                     { name: "water_damage" as const, label: "Water damage" },
                     { name: "stains" as const, label: "Stains" },
                     { name: "stickers" as const, label: "Stickers" },
                     { name: "loose_binding" as const, label: "Loose binding" },
                     { name: "missing_pages" as const, label: "Missing pages" },
-                    { name: "name_written_inside" as const, label: "Name written inside" },
+                    {
+                      name: "name_written_inside" as const,
+                      label: "Name written inside",
+                    },
                   ].map(({ name, label }) => (
                     <label key={name} style={checkboxLabel}>
-                      <input type="checkbox" {...register(name)} style={{ accentColor: colors.primary }} />
+                      <input
+                        type="checkbox"
+                        {...register(name)}
+                        style={{ accentColor: colors.primary }}
+                      />
                       {label}
                     </label>
                   ))}
                 </div>
               </div>
-              <Textarea label="Additional details" rows={3} {...register("damage_details")} />
+              <Textarea
+                label="Additional details"
+                rows={3}
+                {...register("damage_details")}
+              />
             </div>
           </Section>
 
           <Section title="Price">
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <Input
-                label="Price (INR)"
+                label={`Price (${currency})`}
                 type="number"
                 min="0"
                 step="1"
@@ -252,7 +385,11 @@ export default function EditListingPage() {
                 {...register("price")}
               />
               <label style={checkboxLabel}>
-                <input type="checkbox" {...register("negotiable")} style={{ accentColor: colors.primary }} />
+                <input
+                  type="checkbox"
+                  {...register("negotiable")}
+                  style={{ accentColor: colors.primary }}
+                />
                 Price is negotiable
               </label>
               {showExchange && (
@@ -266,22 +403,34 @@ export default function EditListingPage() {
           </Section>
 
           <Section title="Description">
-            <Textarea rows={4} placeholder="Describe your listing..." {...register("description")} />
+            <Textarea
+              rows={4}
+              placeholder="Describe your listing..."
+              {...register("description")}
+            />
           </Section>
 
           <Section title="Delivery">
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <label style={checkboxLabel}>
-                <input type="checkbox" {...register("delivery_pickup")} style={{ accentColor: colors.primary }} />
+                <input
+                  type="checkbox"
+                  {...register("delivery_pickup")}
+                  style={{ accentColor: colors.primary }}
+                />
                 Pickup available
               </label>
               <label style={checkboxLabel}>
-                <input type="checkbox" {...register("delivery_shipping")} style={{ accentColor: colors.primary }} />
+                <input
+                  type="checkbox"
+                  {...register("delivery_shipping")}
+                  style={{ accentColor: colors.primary }}
+                />
                 Shipping available
               </label>
               {showShipping && (
                 <Input
-                  label="Shipping cost (INR, leave blank for free)"
+                  label={`Shipping cost (${currency}, leave blank for free)`}
                   type="number"
                   min="0"
                   {...register("shipping_price")}
@@ -291,21 +440,108 @@ export default function EditListingPage() {
           </Section>
 
           <Section title="Location">
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <Input label="City *" {...register("city", { required: true })} />
-              <Input label="State" {...register("state")} />
-              <Input label="Neighborhood" {...register("neighborhood")} />
-              <Input label="Country" {...register("country")} />
+            <input type="hidden" {...register("city", { required: true })} />
+            <input type="hidden" {...register("state")} />
+            <input type="hidden" {...register("country")} />
+            {changingPlace ? (
+              <div>
+                <PlacePicker
+                  onPick={choosePlace}
+                  defaultCountry={movedTo?.country_code ?? "IN"}
+                />
+                <button
+                  type="button"
+                  className="op-tap"
+                  onClick={() => setChangingPlace(false)}
+                  style={{
+                    marginTop: 10,
+                    background: "none",
+                    border: "none",
+                    color: colors.textSubtle,
+                    fontSize: font.size.sm,
+                    cursor: "pointer",
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  border: `1px solid ${colors.borderStrong}`,
+                  borderRadius: radius.lg,
+                  padding: "12px 14px",
+                }}
+              >
+                <span aria-hidden>📍</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p
+                    style={{
+                      margin: 0,
+                      fontWeight: font.weight.semibold,
+                      color: colors.text,
+                    }}
+                  >
+                    {movedTo
+                      ? shortLocationLabel(movedTo)
+                      : watch("city") || "No location set"}
+                  </p>
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: font.size.sm,
+                      color: colors.textSubtle,
+                    }}
+                  >
+                    {movedTo ? placeContext(movedTo) : watch("state")}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="op-tap"
+                  onClick={() => setChangingPlace(true)}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: colors.primary,
+                    fontWeight: font.weight.semibold,
+                    fontSize: font.size.sm,
+                    cursor: "pointer",
+                    flexShrink: 0,
+                  }}
+                >
+                  Change
+                </button>
+              </div>
+            )}
+            <div style={{ marginTop: 12 }}>
+              <Input
+                label="Area or landmark shown to buyers"
+                {...register("neighborhood")}
+              />
             </div>
             <label style={{ ...checkboxLabel, marginTop: 12 }}>
-              <input type="checkbox" {...register("campus_pickup")} style={{ accentColor: colors.primary }} />
+              <input
+                type="checkbox"
+                {...register("campus_pickup")}
+                style={{ accentColor: colors.primary }}
+              />
               Campus pickup available
             </label>
           </Section>
 
           <div style={{ display: "flex", gap: 10 }}>
-            <Button type="submit" variant="primary" loading={submitting}>Save Changes</Button>
-            <Button type="button" variant="secondary" onClick={() => router.push(`/listings/${listingId}`)}>
+            <Button type="submit" variant="primary" loading={submitting}>
+              Save Changes
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => router.push(`/listings/${listingId}`)}
+            >
               Cancel
             </Button>
           </div>

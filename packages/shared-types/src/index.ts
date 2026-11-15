@@ -46,6 +46,12 @@ export type DevelopmentToken = {
   token?: string | null;
 };
 
+/** Reply to forgot-password; `development_token` is only ever set on a local/dev API. */
+export type RequestAcceptedResponse = {
+  accepted: boolean;
+  development_token?: DevelopmentToken | null;
+};
+
 export type AuthResponse = {
   tokens: TokenPair;
   user: AuthUser;
@@ -264,6 +270,25 @@ export type CategoryTreeResponse = {
   items: CategoryNode[];
 };
 
+export type CategoryOption = {
+  has_children: boolean;
+  name: string;
+  slug: string;
+};
+
+/** One dropdown in the category picker: the children of `parent_slug` (roots when null). */
+export type CategoryLevel = {
+  label: string;
+  options: CategoryOption[];
+  parent_slug?: string | null;
+};
+
+export type CategoryLevelsResponse = {
+  levels: CategoryLevel[];
+  /** The chosen category and its ancestors, root first. */
+  path: CategoryOption[];
+};
+
 export type AuthorListResponse = {
   items: AuthorSummary[];
   next_cursor?: string | null;
@@ -371,6 +396,8 @@ export type ListingImageInput = {
 
 export type ListingCreateRequest = {
   book_id?: string | null;
+  /** Slug from the category tree, e.g. "academic.school.cbse.class-10.science". */
+  category?: string | null;
   condition: ListingCondition;
   currency?: string;
   delivery_methods?: ListingDeliveryMethod[];
@@ -442,6 +469,8 @@ export type ListingPriceHistoryResponse = {
 
 export type ListingResponse = {
   book: { id: string; title: string };
+  category?: { name: string; slug: string } | null;
+  visibility?: "public" | "private" | "business_only" | "institution_only";
   condition?: ListingCondition | null;
   created_at: string;
   currency: string;
@@ -499,8 +528,14 @@ export type ListingSearchParams = {
   condition?: ConditionGrade | null;
   country?: string | null;
   cursor?: string | null;
+  /** ISO currency the min/max price filters are in. */
+  currency?: string | null;
   delivery_method?: DeliveryMethod | null;
   distance_km?: number | null;
+  /** Public id of a seller whose listings are left out (the reader themselves). */
+  exclude_seller_id?: string | null;
+  /** Only this seller's listings (their public profile). */
+  seller_id?: string | null;
   first_edition?: boolean | null;
   format?: string | null;
   free_only?: boolean | null;

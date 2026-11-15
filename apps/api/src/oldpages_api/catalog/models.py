@@ -171,6 +171,8 @@ class Category(TimestampMixin, PublicIdMixin, Base):
     )
     name: Mapped[str] = mapped_column(String(160), nullable=False)
     slug: Mapped[str] = mapped_column(String(180), nullable=False)
+    # Label for the dropdown of this category's children, e.g. "Board", "Class / Grade".
+    child_label: Mapped[str | None] = mapped_column(String(60), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)

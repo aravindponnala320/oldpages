@@ -2,15 +2,15 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request, Response, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from oldpages_api.identity.dependencies import (
     CurrentPrincipal,
     get_current_principal,
+    get_optional_principal,
     request_context,
 )
-from fastapi import Query
 from oldpages_api.listings.schemas import (
     CompleteMediaUploadRequest,
     ListingCreateRequest,
@@ -28,6 +28,7 @@ media_router = APIRouter(prefix="/media", tags=["media"])
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 PrincipalDep = Annotated[CurrentPrincipal, Depends(get_current_principal)]
+OptionalPrincipalDep = Annotated[CurrentPrincipal | None, Depends(get_optional_principal)]
 
 
 def listing_service(request: Request, session: AsyncSession) -> ListingService:
@@ -66,8 +67,10 @@ async def get_listing(
     listing_id: str,
     request: Request,
     session: SessionDep,
+    principal: OptionalPrincipalDep,
 ) -> ListingResponse:
-    return await listing_service(request, session).get_listing(listing_id)
+    viewer = principal.user if principal else None
+    return await listing_service(request, session).get_listing(listing_id, viewer)
 
 
 @listings_router.patch("/{listing_id}", response_model=ListingResponse)

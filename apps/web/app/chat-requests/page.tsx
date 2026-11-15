@@ -20,10 +20,13 @@ import {
   radius,
   useToast,
 } from "../../components/ui";
+import { apiBaseUrl } from "../../lib/api";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
-
-interface UserSummary { id: string; display_name?: string | null; username?: string | null; }
+interface UserSummary {
+  id: string;
+  display_name?: string | null;
+  username?: string | null;
+}
 interface ChatRequest {
   id: string;
   status: "pending" | "accepted" | "declined" | "blocked";
@@ -37,7 +40,10 @@ interface ChatRequest {
   responded_at: string | null;
 }
 
-const STATUS_VARIANT: Record<ChatRequest["status"], "warning" | "success" | "danger" | "default"> = {
+const STATUS_VARIANT: Record<
+  ChatRequest["status"],
+  "warning" | "success" | "danger" | "default"
+> = {
   pending: "warning",
   accepted: "success",
   declined: "danger",
@@ -56,7 +62,10 @@ function timeAgo(iso: string): string {
   if (diff < 60_000) return "just now";
   if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
   if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
-  return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+  return new Date(iso).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+  });
 }
 
 export default function ChatRequestsPage() {
@@ -80,10 +89,10 @@ export default function ChatRequestsPage() {
     if (!token) return;
     setLoading(true);
     Promise.all([
-      fetch(`${API_BASE}/api/v1/chat-requests?role=recipient&limit=50`, {
+      fetch(`${apiBaseUrl}/api/v1/chat-requests?role=recipient&limit=50`, {
         headers: { Authorization: `Bearer ${token}` },
       }).then((r) => (r.ok ? r.json() : [])),
-      fetch(`${API_BASE}/api/v1/chat-requests?role=requester&limit=50`, {
+      fetch(`${apiBaseUrl}/api/v1/chat-requests?role=requester&limit=50`, {
         headers: { Authorization: `Bearer ${token}` },
       }).then((r) => (r.ok ? r.json() : [])),
     ])
@@ -100,15 +109,26 @@ export default function ChatRequestsPage() {
     if (!token) return;
     setActionLoading(req.id);
     try {
-      const res = await fetch(`${API_BASE}/api/v1/chat-requests/${req.id}/accept`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({}),
-      });
+      const res = await fetch(
+        `${apiBaseUrl}/api/v1/chat-requests/${req.id}/accept`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({}),
+        },
+      );
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail ?? "Failed to accept");
       if (data.conversation_id) router.push(`/inbox/${data.conversation_id}`);
-      else setIncoming((prev) => prev.map((r) => (r.id === req.id ? { ...r, status: "accepted" as const } : r)));
+      else
+        setIncoming((prev) =>
+          prev.map((r) =>
+            r.id === req.id ? { ...r, status: "accepted" as const } : r,
+          ),
+        );
       toast("Request accepted", "success");
     } catch (err) {
       toast(err instanceof Error ? err.message : "Failed to accept", "error");
@@ -122,13 +142,23 @@ export default function ChatRequestsPage() {
     if (!token) return;
     setActionLoading(req.id);
     try {
-      const res = await fetch(`${API_BASE}/api/v1/chat-requests/${req.id}/decline`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({}),
-      });
+      const res = await fetch(
+        `${apiBaseUrl}/api/v1/chat-requests/${req.id}/decline`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({}),
+        },
+      );
       if (!res.ok) throw new Error("Failed to decline");
-      setIncoming((prev) => prev.map((r) => (r.id === req.id ? { ...r, status: "declined" as const } : r)));
+      setIncoming((prev) =>
+        prev.map((r) =>
+          r.id === req.id ? { ...r, status: "declined" as const } : r,
+        ),
+      );
       toast("Request declined", "info");
     } catch (err) {
       toast(err instanceof Error ? err.message : "Failed to decline", "error");
@@ -139,7 +169,9 @@ export default function ChatRequestsPage() {
 
   if (isLoading) {
     return (
-      <div style={{ display: "flex", justifyContent: "center", paddingTop: 60 }}>
+      <div
+        style={{ display: "flex", justifyContent: "center", paddingTop: 60 }}
+      >
         <Spinner size="lg" />
       </div>
     );
@@ -162,8 +194,14 @@ export default function ChatRequestsPage() {
           }
           actions={
             <Link
+              className="op-tap"
               href="/inbox"
-              style={{ fontSize: font.size.base, color: colors.primary, fontWeight: font.weight.semibold, textDecoration: "none" }}
+              style={{
+                fontSize: font.size.base,
+                color: colors.primary,
+                fontWeight: font.weight.semibold,
+                textDecoration: "none",
+              }}
             >
               Open Inbox →
             </Link>
@@ -174,7 +212,7 @@ export default function ChatRequestsPage() {
           <Tabs
             tabs={[
               { key: "incoming", label: "Incoming", count: incoming.length },
-              { key: "sent",     label: "Sent",     count: sent.length },
+              { key: "sent", label: "Sent", count: sent.length },
             ]}
             value={tab}
             onChange={(k) => setTab(k as "incoming" | "sent")}
@@ -182,13 +220,17 @@ export default function ChatRequestsPage() {
         </div>
 
         {loading ? (
-          <div style={{ display: "flex", justifyContent: "center", padding: 40 }}>
+          <div
+            style={{ display: "flex", justifyContent: "center", padding: 40 }}
+          >
             <Spinner size="md" />
           </div>
         ) : currentList.length === 0 ? (
           <EmptyState
             icon={<Icon.chat size={26} color={colors.primary} />}
-            title={tab === "incoming" ? "No incoming requests" : "No sent requests"}
+            title={
+              tab === "incoming" ? "No incoming requests" : "No sent requests"
+            }
             description={
               tab === "incoming"
                 ? "When someone messages you about a listing, it appears here."
@@ -200,8 +242,10 @@ export default function ChatRequestsPage() {
             {currentList.map((req) => {
               const isPending = req.status === "pending";
               const isActing = actionLoading === req.id;
-              const otherUser = tab === "incoming" ? req.requester : req.recipient;
-              const otherName = otherUser.display_name ?? `User ${otherUser.id.slice(0, 8)}`;
+              const otherUser =
+                tab === "incoming" ? req.requester : req.recipient;
+              const otherName =
+                otherUser.display_name ?? `User ${otherUser.id.slice(0, 8)}`;
 
               return (
                 <div
@@ -209,27 +253,73 @@ export default function ChatRequestsPage() {
                   style={{
                     background: colors.surface,
                     border: `1px solid ${isPending && tab === "incoming" ? "#bbf7d0" : colors.border}`,
-                    borderLeft: isPending && tab === "incoming" ? `4px solid ${colors.primary}` : `1px solid ${colors.border}`,
+                    borderLeft:
+                      isPending && tab === "incoming"
+                        ? `4px solid ${colors.primary}`
+                        : `1px solid ${colors.border}`,
                     borderRadius: radius.xl,
                     padding: 18,
                   }}
                 >
-                  <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 14,
+                      alignItems: "flex-start",
+                    }}
+                  >
                     <Avatar name={otherName} />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
-                        <span style={{ fontWeight: font.weight.bold, color: colors.text, fontSize: font.size.md }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          flexWrap: "wrap",
+                          marginBottom: 4,
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontWeight: font.weight.bold,
+                            color: colors.text,
+                            fontSize: font.size.md,
+                          }}
+                        >
                           {otherName}
                         </span>
-                        <Badge variant={STATUS_VARIANT[req.status]} label={STATUS_LABEL[req.status]} />
-                        <span style={{ color: colors.textFaint, fontSize: font.size.xs, marginLeft: "auto" }}>
+                        <Badge
+                          variant={STATUS_VARIANT[req.status]}
+                          label={STATUS_LABEL[req.status]}
+                        />
+                        <span
+                          style={{
+                            color: colors.textFaint,
+                            fontSize: font.size.xs,
+                            marginLeft: "auto",
+                          }}
+                        >
                           {timeAgo(req.created_at)}
                         </span>
                       </div>
 
                       {req.listing_title && (
-                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-                          <span style={{ fontSize: font.size.xs, color: colors.textFaint }}>Re:</span>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            marginBottom: 8,
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: font.size.xs,
+                              color: colors.textFaint,
+                            }}
+                          >
+                            Re:
+                          </span>
                           <Link
                             href={`/listings/${req.listing_id}`}
                             style={{
@@ -254,7 +344,15 @@ export default function ChatRequestsPage() {
                             borderLeft: `3px solid ${colors.borderStrong}`,
                           }}
                         >
-                          <p style={{ color: colors.textMuted, fontSize: font.size.base, margin: 0, fontStyle: "italic", lineHeight: 1.55 }}>
+                          <p
+                            style={{
+                              color: colors.textMuted,
+                              fontSize: font.size.base,
+                              margin: 0,
+                              fontStyle: "italic",
+                              lineHeight: 1.55,
+                            }}
+                          >
                             &ldquo;{req.initial_message}&rdquo;
                           </p>
                         </div>
@@ -271,7 +369,12 @@ export default function ChatRequestsPage() {
                           >
                             Accept &amp; Chat
                           </Button>
-                          <Button variant="secondary" size="sm" disabled={isActing} onClick={() => handleDecline(req)}>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            disabled={isActing}
+                            onClick={() => handleDecline(req)}
+                          >
                             Decline
                           </Button>
                         </div>

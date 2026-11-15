@@ -18,10 +18,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from oldpages_api.business.models import BusinessProfile
-from oldpages_api.catalog.models import BookEdition
+from oldpages_api.catalog.models import BookEdition, Category
 from oldpages_api.identity.models import User
-from oldpages_api.institutions.models import Institution
 from oldpages_api.shared.db.base import Base, PublicIdMixin, TimestampMixin
 
 
@@ -42,6 +40,7 @@ class Listing(TimestampMixin, PublicIdMixin, Base):
         Index("ix_listings_book_edition_id", "book_edition_id"),
         Index("ix_listings_status", "status"),
         Index("ix_listings_created_at", "created_at"),
+        Index("ix_listings_category_id", "category_id"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -58,6 +57,10 @@ class Listing(TimestampMixin, PublicIdMixin, Base):
     )
     institution_id: Mapped[int | None] = mapped_column(
         ForeignKey("institutions.id", ondelete="SET NULL"), nullable=True
+    )
+    # The seller's pick from the category tree for this copy (the book's own categories are shared).
+    category_id: Mapped[int | None] = mapped_column(
+        ForeignKey("categories.id", ondelete="SET NULL"), nullable=True
     )
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="draft")
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -105,6 +108,7 @@ class Listing(TimestampMixin, PublicIdMixin, Base):
         cascade="all, delete-orphan",
     )
     seller: Mapped[User] = relationship()
+    category: Mapped[Category | None] = relationship(lazy="selectin")
 
 
 class ListingCondition(TimestampMixin, PublicIdMixin, Base):

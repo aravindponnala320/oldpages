@@ -192,7 +192,7 @@ class CommunityRepository:
         cursor: str | None,
         limit: int,
     ) -> tuple[list[Listing], str | None]:
-        stmt: Select[tuple[Listing]] = (
+        stmt: Select[Listing] = (
             select(Listing)
             .options(*listing_load_options())
             .where(Listing.status == "active")

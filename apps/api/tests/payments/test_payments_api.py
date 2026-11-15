@@ -1,113 +1,57 @@
 from __future__ import annotations
 
-from typing import Any
-
 import pytest
 from httpx import AsyncClient
 
 from conftest import RegisterUser
-from helpers import auth, create_published_listing
+from helpers import (
+    address,
+    auth,
+    capture_order_payment,
+    create_published_listing,
+    create_shipping_order,
+)
 
 
-def address(name: str) -> dict[str, str]:
-    return {
-        "address_line1": "Library Road 1",
-        "city": "Pune",
-        "country": "IN",
-        "name": name,
-        "phone": "+911234567890",
-        "pincode": "411001",
-        "state": "Maharashtra",
-    }
-
-
-async def create_shipping_order(
+@pytest.mark.asyncio
+async def test_cart_and_order_use_listing_currency_and_never_mix(
     client: AsyncClient,
     register_user: RegisterUser,
-    *,
-    suffix: str,
-    price_amount_cents: int = 12_000,
-) -> dict[str, Any]:
-    seller = await register_user(
-        client,
-        email=f"seller-payments-{suffix}@example.com",
-        username=f"seller-payments-{suffix}",
-    )
-    buyer = await register_user(
-        client,
-        email=f"buyer-payments-{suffix}@example.com",
-        username=f"buyer-payments-{suffix}",
-    )
+) -> None:
+    seller = await register_user(client, email="seller-fx@example.com", username="seller-fx")
+    buyer = await register_user(client, email="buyer-fx@example.com", username="buyer-fx")
     seller_token = seller["tokens"]["access_token"]
     buyer_token = buyer["tokens"]["access_token"]
-    listing = await create_published_listing(
-        client,
-        seller_token,
-        title=f"Payments Book {suffix}",
-        price_amount_cents=price_amount_cents,
+    usd_listing = await create_published_listing(
+        client, seller_token, title="Boston Book", price_amount_cents=1_500, country="US"
     )
-
-    cart_response = await client.post(
-        "/api/v1/carts",
-        headers=auth(buyer_token),
-        json={"seller_id": seller["user"]["id"]},
+    inr_listing = await create_published_listing(client, seller_token, title="Pune Book")
+    cart = await client.post(
+        "/api/v1/carts", headers=auth(buyer_token), json={"seller_id": seller["user"]["id"]}
     )
-    assert cart_response.status_code == 201, cart_response.text
-    cart_id = cart_response.json()["id"]
+    cart_id = cart.json()["id"]
 
-    add_item_response = await client.post(
+    added = await client.post(
         f"/api/v1/carts/{cart_id}/items",
         headers=auth(buyer_token),
-        json={"listing_id": listing["id"], "quantity": 1},
+        json={"listing_id": usd_listing["id"], "quantity": 1},
     )
-    assert add_item_response.status_code == 200, add_item_response.text
-
-    checkout_response = await client.post(
+    mixed = await client.post(
+        f"/api/v1/carts/{cart_id}/items",
+        headers=auth(buyer_token),
+        json={"listing_id": inr_listing["id"], "quantity": 1},
+    )
+    order = await client.post(
         f"/api/v1/carts/{cart_id}/checkout",
         headers=auth(buyer_token),
-        json={"fulfillment_method": "shipping", "idempotency_key": f"checkout-{suffix}"},
+        json={"fulfillment_method": "shipping", "idempotency_key": "checkout-fx"},
     )
-    assert checkout_response.status_code == 200, checkout_response.text
-    order = checkout_response.json()
 
-    payment_response = await client.post(
-        f"/api/v1/payments/{order['id']}/initiate",
-        headers=auth(buyer_token),
-        json={"idempotency_key": f"pay-{suffix}", "provider": "local"},
-    )
-    assert payment_response.status_code == 201, payment_response.text
-
-    return {
-        "buyer": buyer,
-        "buyer_token": buyer_token,
-        "cart_id": cart_id,
-        "listing": listing,
-        "order": order,
-        "payment": payment_response.json()["payment"],
-        "provider_data": payment_response.json()["provider_data"],
-        "seller": seller,
-        "seller_token": seller_token,
-    }
-
-
-async def capture_order_payment(
-    client: AsyncClient,
-    order_id: str,
-    provider_payment_id: str,
-    *,
-    event_id: str,
-) -> None:
-    capture = await client.post(
-        "/api/v1/payments/webhook/local",
-        json={
-            "event_id": event_id,
-            "provider_payment_id": provider_payment_id,
-            "status": "captured",
-            "type": "payment.captured",
-        },
-    )
-    assert capture.status_code == 200, capture.text
-    assert capture.json() == {"status": "processed"}
+    assert added.status_code == 200, added.text
+    assert added.json()["currency"] == "USD"
+    assert mixed.status_code == 422, mixed.text
+    assert order.status_code == 200, order.text
+    assert order.json()["currency"] == "USD"
 
 
 @pytest.mark.asyncio

@@ -22,14 +22,19 @@ import {
   radius,
   useToast,
 } from "../../components/ui";
-import type { WishlistItemResponse, BookResponse } from "@oldpages/shared-types";
+import type {
+  WishlistItemResponse,
+  BookResponse,
+} from "@oldpages/shared-types";
 
 export default function WishlistsPage() {
   const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
 
-  const [wishlistItems, setWishlistItems] = useState<WishlistItemResponse[]>([]);
+  const [wishlistItems, setWishlistItems] = useState<WishlistItemResponse[]>(
+    [],
+  );
   const [loading, setLoading] = useState(true);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -50,7 +55,11 @@ export default function WishlistsPage() {
   }, [isAuthenticated]);
 
   useEffect(() => {
-    if (!searchQuery.trim()) { setSearchResults([]); setShowDropdown(false); return; }
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      setShowDropdown(false);
+      return;
+    }
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
     searchTimeout.current = setTimeout(async () => {
       setSearchLoading(true);
@@ -64,7 +73,9 @@ export default function WishlistsPage() {
         setSearchLoading(false);
       }
     }, 400);
-    return () => { if (searchTimeout.current) clearTimeout(searchTimeout.current); };
+    return () => {
+      if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    };
   }, [searchQuery]);
 
   const handleAdd = async (book: BookResponse) => {
@@ -102,7 +113,14 @@ export default function WishlistsPage() {
 
   if (isLoading || loading) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: "60vh",
+        }}
+      >
         <Spinner size="lg" />
       </div>
     );
@@ -145,7 +163,9 @@ export default function WishlistsPage() {
                   }}
                 >
                   {searchResults.map((book) => {
-                    const already = wishlistItems.some((w) => w.book.id === book.id);
+                    const already = wishlistItems.some(
+                      (w) => w.book.id === book.id,
+                    );
                     return (
                       <div
                         key={book.id}
@@ -159,18 +179,43 @@ export default function WishlistsPage() {
                       >
                         {book.cover_image_url && (
                           <img
+                            loading="lazy"
+                            decoding="async"
                             src={book.cover_image_url}
                             alt={book.title}
-                            style={{ width: 40, height: 52, objectFit: "cover", borderRadius: 4, flexShrink: 0 }}
+                            style={{
+                              width: 40,
+                              height: 52,
+                              objectFit: "cover",
+                              borderRadius: 4,
+                              flexShrink: 0,
+                            }}
                           />
                         )}
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <p style={{ margin: 0, fontWeight: font.weight.semibold, fontSize: font.size.base, color: colors.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          <p
+                            style={{
+                              margin: 0,
+                              fontWeight: font.weight.semibold,
+                              fontSize: font.size.base,
+                              color: colors.text,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
                             {book.title}
                           </p>
-                          <p style={{ margin: 0, fontSize: font.size.sm, color: colors.textSubtle }}>
+                          <p
+                            style={{
+                              margin: 0,
+                              fontSize: font.size.sm,
+                              color: colors.textSubtle,
+                            }}
+                          >
                             {book.authors.map((a) => a.name).join(", ")}
-                            {book.publication_year && ` · ${book.publication_year}`}
+                            {book.publication_year &&
+                              ` · ${book.publication_year}`}
                           </p>
                         </div>
                         <Button
@@ -196,7 +241,9 @@ export default function WishlistsPage() {
             icon={<Icon.clipboard size={26} color={colors.primary} />}
             title="Your wishlist is empty"
             description="Add books you want to read or buy. You'll be notified when copies become available from sellers near you."
-            action={<LinkButton href="/search">Explore Book Catalog</LinkButton>}
+            action={
+              <LinkButton href="/search">Explore Book Catalog</LinkButton>
+            }
           />
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -213,30 +260,75 @@ export default function WishlistsPage() {
                   gap: 14,
                 }}
               >
-                <div style={{ width: 48, height: 64, background: colors.surfaceMuted, borderRadius: radius.md, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <div
+                  style={{
+                    width: 48,
+                    height: 64,
+                    background: colors.surfaceMuted,
+                    borderRadius: radius.md,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
                   <Icon.book size={22} color={colors.textFaint} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ margin: 0, fontWeight: font.weight.semibold, fontSize: font.size.md, color: colors.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <p
+                    style={{
+                      margin: 0,
+                      fontWeight: font.weight.semibold,
+                      fontSize: font.size.md,
+                      color: colors.text,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
                     {item.book.title}
                   </p>
-                  <p style={{ margin: "3px 0 6px", fontSize: font.size.sm, color: colors.textSubtle }}>
+                  <p
+                    style={{
+                      margin: "3px 0 6px",
+                      fontSize: font.size.sm,
+                      color: colors.textSubtle,
+                    }}
+                  >
                     {item.book.authors.join(", ")}
                   </p>
                   <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                    {item.book.categories?.slice(0, 2).map((c) => <Badge key={c} label={c} />)}
+                    {item.book.categories?.slice(0, 2).map((c) => (
+                      <Badge key={c} label={c} />
+                    ))}
                   </div>
-                  <p style={{ margin: "6px 0 0", fontSize: font.size.xs, color: colors.textFaint }}>
+                  <p
+                    style={{
+                      margin: "6px 0 0",
+                      fontSize: font.size.xs,
+                      color: colors.textFaint,
+                    }}
+                  >
                     Added {new Date(item.created_at).toLocaleDateString()}
                   </p>
                 </div>
                 <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-                  <LinkButton href={`/search?q=${encodeURIComponent(item.book.title)}`} variant="secondary" size="sm">
+                  <LinkButton
+                    href={`/search?q=${encodeURIComponent(item.book.title)}`}
+                    variant="secondary"
+                    size="sm"
+                  >
                     Find Copies
                   </LinkButton>
                   <IconButton
                     ariaLabel="Remove from wishlist"
-                    icon={removingId === item.id ? <Spinner size="sm" /> : <Icon.trash size={16} />}
+                    icon={
+                      removingId === item.id ? (
+                        <Spinner size="sm" />
+                      ) : (
+                        <Icon.trash size={16} />
+                      )
+                    }
                     onClick={() => handleRemove(item)}
                     disabled={removingId === item.id}
                     variant="ghost"

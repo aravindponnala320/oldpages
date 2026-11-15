@@ -5,14 +5,7 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { LocationSwitcher } from "./LocationSwitcher";
-import {
-  Icon,
-  SearchBar,
-  colors,
-  font,
-  layout,
-  zIndex,
-} from "./ui";
+import { Icon, SearchBar, colors, font, layout, zIndex } from "./ui";
 
 type Props = {
   children: ReactNode;
@@ -32,16 +25,18 @@ type Props = {
 export function AppShell({ children, hideBottomNav, minimalHeader }: Props) {
   return (
     <div
+      // Without the bottom nav the page is a full-height app view (e.g. a chat thread):
+      // the shell fills the visible viewport and main takes the space under the header.
+      className={hideBottomNav ? "op-shell-fullscreen" : "op-shell-with-nav"}
       style={{
         background: colors.bg,
         minHeight: "100vh",
         fontFamily: font.family,
-        paddingBottom: hideBottomNav ? 0 : layout.bottomNavHeight + 24,
         color: colors.text,
       }}
     >
       <TopHeader minimal={minimalHeader} />
-      <main>{children}</main>
+      <main className="op-shell-main">{children}</main>
       {!hideBottomNav && <BottomNav />}
     </div>
   );
@@ -62,19 +57,12 @@ function TopHeader({ minimal }: { minimal?: boolean }) {
         zIndex: zIndex.header,
       }}
     >
-      <div
-        style={{
-          maxWidth: layout.maxWidth,
-          margin: "0 auto",
-          padding: `16px ${layout.gutter}px`,
-          display: "flex",
-          alignItems: "center",
-          gap: 24,
-        }}
-      >
+      <div className="op-header-inner" style={{ maxWidth: layout.maxWidth }}>
         {/* Brand */}
         <Link
           href="/"
+          className="op-header-brand"
+          aria-label="OldPages home"
           style={{
             display: "flex",
             alignItems: "center",
@@ -83,7 +71,9 @@ function TopHeader({ minimal }: { minimal?: boolean }) {
             flexShrink: 0,
           }}
         >
-          <Icon.logo size={42} />
+          <span className="op-header-logo">
+            <Icon.logo size={42} />
+          </span>
           <div>
             <div
               style={{
@@ -96,36 +86,66 @@ function TopHeader({ minimal }: { minimal?: boolean }) {
             >
               OldPages
             </div>
-            <div style={{ fontSize: 10, color: colors.textSubtle, marginTop: 3 }}>
+            <div
+              className="op-header-tagline"
+              style={{ fontSize: 12, color: colors.textSubtle, marginTop: 3 }}
+            >
               Every old book finds a new reader
             </div>
           </div>
         </Link>
 
         {!minimal && (
-          <>
+          <div className="op-header-tools">
             <LocationSwitcher />
             <SearchBar />
-          </>
+          </div>
         )}
 
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 24,
-            marginLeft: "auto",
-            flexShrink: 0,
-          }}
-        >
+        <nav className="op-header-actions" aria-label="Account">
           <HeaderLink href="/inbox" icon={<Icon.chat />} label="Chats" />
-          <HeaderLink href="/favorites" icon={<Icon.heart />} label="Favorites" />
+          <HeaderLink
+            href="/favorites"
+            icon={<Icon.heart />}
+            label="Favorites"
+          />
           {isAuthenticated && user ? (
-            <HeaderLink href="/profile/me" icon={<Icon.user />} label={displayName(user.email)} />
+            <>
+              <HeaderLink
+                href="/my-listings"
+                icon={<Icon.clipboard />}
+                label="My Ads"
+                desktopOnly
+              />
+              <HeaderLink
+                href="/profile/me"
+                icon={<Icon.user />}
+                label={displayName(user.email)}
+                desktopOnly
+              />
+            </>
           ) : (
             <HeaderLink href="/login" icon={<Icon.user />} label="Login" />
           )}
-        </div>
+          <Link
+            href="/listings/create"
+            className="op-desktop-nav"
+            style={{
+              alignItems: "center",
+              gap: 6,
+              padding: "10px 18px",
+              borderRadius: 999,
+              background: colors.primary,
+              color: "#fff",
+              fontSize: font.size.base,
+              fontWeight: font.weight.semibold,
+              textDecoration: "none",
+              whiteSpace: "nowrap",
+            }}
+          >
+            + Sell
+          </Link>
+        </nav>
       </div>
     </header>
   );
@@ -136,22 +156,40 @@ function displayName(email: string): string {
   return local.length > 14 ? `${local.slice(0, 12)}…` : local;
 }
 
-function HeaderLink({ href, icon, label }: { href: string; icon: ReactNode; label: string }) {
+function HeaderLink({
+  href,
+  icon,
+  label,
+  desktopOnly,
+}: {
+  href: string;
+  icon: ReactNode;
+  label: string;
+  desktopOnly?: boolean;
+}) {
   return (
     <Link
       href={href}
+      aria-label={label}
+      title={label}
+      className={
+        desktopOnly ? "op-header-link op-desktop-nav" : "op-header-link"
+      }
       style={{
-        display: "flex",
         alignItems: "center",
+        justifyContent: "center",
         gap: 8,
+        minWidth: 40,
+        minHeight: 40,
         textDecoration: "none",
         color: colors.textMuted,
         fontSize: font.size.base,
         fontWeight: font.weight.medium,
+        whiteSpace: "nowrap",
       }}
     >
       {icon}
-      {label}
+      <span className="op-header-label">{label}</span>
     </Link>
   );
 }
@@ -165,6 +203,8 @@ function BottomNav() {
 
   return (
     <nav
+      className="op-bottom-nav"
+      aria-label="Main"
       style={{
         position: "fixed",
         bottom: 0,
@@ -172,24 +212,62 @@ function BottomNav() {
         right: 0,
         background: colors.surface,
         borderTop: `1px solid ${colors.border}`,
-        padding: "10px 0 12px",
+        padding: "8px 0 calc(10px + env(safe-area-inset-bottom))",
         zIndex: zIndex.bottomNav,
       }}
     >
       <div
         style={{
-          maxWidth: layout.maxWidth,
+          maxWidth: 640,
           margin: "0 auto",
           display: "grid",
           gridTemplateColumns: "repeat(5, 1fr)",
           alignItems: "center",
         }}
       >
-        <NavItem href="/" label="Home" icon={<Icon.home color={isActive("/") ? colors.primary : colors.textSubtle} />} active={isActive("/")} />
-        <NavItem href="/offers" label="Promotion" icon={<Icon.megaphone color={isActive("/offers") ? colors.primary : colors.textSubtle} />} active={isActive("/offers")} />
+        <NavItem
+          href="/"
+          label="Home"
+          icon={
+            <Icon.home
+              color={isActive("/") ? colors.primary : colors.textSubtle}
+            />
+          }
+          active={isActive("/")}
+        />
+        <NavItem
+          href="/offers"
+          label="Promotion"
+          icon={
+            <Icon.megaphone
+              color={isActive("/offers") ? colors.primary : colors.textSubtle}
+            />
+          }
+          active={isActive("/offers")}
+        />
         <SellItem />
-        <NavItem href="/my-listings" label="My Ads" icon={<Icon.clipboard color={isActive("/my-listings") ? colors.primary : colors.textSubtle} />} active={isActive("/my-listings")} />
-        <NavItem href="/profile/me" label="Account" icon={<Icon.user color={isActive("/profile") ? colors.primary : colors.textSubtle} />} active={isActive("/profile")} />
+        <NavItem
+          href="/my-listings"
+          label="My Ads"
+          icon={
+            <Icon.clipboard
+              color={
+                isActive("/my-listings") ? colors.primary : colors.textSubtle
+              }
+            />
+          }
+          active={isActive("/my-listings")}
+        />
+        <NavItem
+          href="/profile/me"
+          label="Account"
+          icon={
+            <Icon.user
+              color={isActive("/profile") ? colors.primary : colors.textSubtle}
+            />
+          }
+          active={isActive("/profile")}
+        />
       </div>
     </nav>
   );
@@ -209,17 +287,22 @@ function NavItem({
   return (
     <Link
       href={href}
+      aria-current={active ? "page" : undefined}
       style={{
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
+        justifyContent: "center",
         gap: 4,
+        minHeight: 48,
         textDecoration: "none",
         color: active ? colors.primary : colors.textSubtle,
       }}
     >
       {icon}
-      <span style={{ fontSize: font.size.sm, fontWeight: font.weight.medium }}>{label}</span>
+      <span style={{ fontSize: font.size.sm, fontWeight: font.weight.medium }}>
+        {label}
+      </span>
     </Link>
   );
 }
@@ -252,7 +335,9 @@ function SellItem() {
       >
         <Icon.plus />
       </div>
-      <span style={{ fontSize: font.size.sm, fontWeight: font.weight.medium }}>Sell</span>
+      <span style={{ fontSize: font.size.sm, fontWeight: font.weight.medium }}>
+        Sell
+      </span>
     </Link>
   );
 }

@@ -21,9 +21,24 @@ type CommonProps = {
 };
 
 const sizes: Record<Size, CSSProperties> = {
-  sm: { padding: "7px 14px", fontSize: font.size.sm, borderRadius: radius.md, minHeight: 32 },
-  md: { padding: "10px 18px", fontSize: font.size.base, borderRadius: radius.lg, minHeight: 40 },
-  lg: { padding: "13px 22px", fontSize: font.size.md, borderRadius: radius.lg, minHeight: 46 },
+  sm: {
+    padding: "7px 14px",
+    fontSize: font.size.sm,
+    borderRadius: radius.md,
+    minHeight: 32,
+  },
+  md: {
+    padding: "10px 18px",
+    fontSize: font.size.base,
+    borderRadius: radius.lg,
+    minHeight: 40,
+  },
+  lg: {
+    padding: "13px 22px",
+    fontSize: font.size.md,
+    borderRadius: radius.lg,
+    minHeight: 46,
+  },
 };
 
 const variants: Record<Variant, CSSProperties> = {
@@ -66,7 +81,8 @@ const base: CSSProperties = {
   textDecoration: "none",
   lineHeight: 1,
   whiteSpace: "nowrap",
-  transition: "background 0.15s, border-color 0.15s, box-shadow 0.15s, opacity 0.15s",
+  transition:
+    "background 0.15s, border-color 0.15s, box-shadow 0.15s, opacity 0.15s",
 };
 
 export function buttonStyle({
@@ -113,7 +129,13 @@ export function Button({
     <button
       {...rest}
       disabled={isDisabled}
-      style={buttonStyle({ variant, size, fullWidth, disabled: isDisabled, extra: style })}
+      style={buttonStyle({
+        variant,
+        size,
+        fullWidth,
+        disabled: isDisabled,
+        extra: style,
+      })}
     >
       {loading ? <Spinner size="sm" /> : leftIcon}
       {children}
@@ -122,7 +144,11 @@ export function Button({
   );
 }
 
-type LinkButtonProps = CommonProps & { href: string; target?: string; rel?: string };
+type LinkButtonProps = CommonProps & {
+  href: string;
+  target?: string;
+  rel?: string;
+};
 
 export function LinkButton({
   href,

@@ -12,9 +12,10 @@ from oldpages_api.api.router import api_router
 from oldpages_api.chat.router import websocket_router
 from oldpages_api.core.config import Settings, get_settings
 from oldpages_api.core.exception_handlers import register_exception_handlers
+from oldpages_api.core.middleware.body_limit import BodyLimitMiddleware
 from oldpages_api.core.middleware.request_id import RequestIdMiddleware
-from oldpages_api.health.router import router as health_router
 from oldpages_api.geo.http import close_http_client as close_geo_http
+from oldpages_api.health.router import router as health_router
 from oldpages_api.shared.cache.redis import close_redis
 from oldpages_api.shared.db.database import dispose_database_engine
 from oldpages_api.shared.observability.logging import configure_logging
@@ -46,6 +47,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.state.settings = app_settings
 
+    app.add_middleware(BodyLimitMiddleware, max_bytes=app_settings.max_request_body_bytes)
     app.add_middleware(RequestIdMiddleware, header_name=app_settings.request_id_header)
     app.add_middleware(
         CORSMiddleware,

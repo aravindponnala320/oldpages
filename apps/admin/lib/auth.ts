@@ -12,7 +12,11 @@ export function getUserEmail(): string | null {
   return localStorage.getItem(USER_EMAIL_KEY);
 }
 
-export function setTokens(access: string, refresh: string, email?: string): void {
+export function setTokens(
+  access: string,
+  refresh: string,
+  email?: string,
+): void {
   localStorage.setItem(ACCESS_TOKEN_KEY, access);
   localStorage.setItem(REFRESH_TOKEN_KEY, refresh);
   if (email) localStorage.setItem(USER_EMAIL_KEY, email);

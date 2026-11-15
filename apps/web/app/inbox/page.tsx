@@ -19,15 +19,18 @@ import {
   font,
   radius,
 } from "../../components/ui";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+import { apiBaseUrl } from "../../lib/api";
 
 interface UserSummary {
   id: string;
   display_name?: string | null;
   username?: string | null;
 }
-interface ConversationMember { role: string; status: string; user: UserSummary; }
+interface ConversationMember {
+  role: string;
+  status: string;
+  user: UserSummary;
+}
 interface Conversation {
   id: string;
   status: string;
@@ -46,8 +49,12 @@ function timeAgo(iso: string | null | undefined): string {
   if (diff < 60_000) return "just now";
   if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m`;
   if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h`;
-  if (diff < 7 * 86_400_000) return new Date(iso).toLocaleDateString("en-IN", { weekday: "short" });
-  return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+  if (diff < 7 * 86_400_000)
+    return new Date(iso).toLocaleDateString("en-IN", { weekday: "short" });
+  return new Date(iso).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+  });
 }
 
 export default function InboxPage() {
@@ -70,16 +77,23 @@ export default function InboxPage() {
     if (!token) return;
     setLoading(true);
     Promise.all([
-      fetch(`${API_BASE}/api/v1/conversations?limit=50`, { headers: { Authorization: `Bearer ${token}` } })
-        .then((r) => (r.ok ? r.json() : { items: [] })),
-      fetch(`${API_BASE}/api/v1/chat-requests?role=recipient&status=pending&limit=50`, {
+      fetch(`${apiBaseUrl}/api/v1/conversations?limit=50`, {
         headers: { Authorization: `Bearer ${token}` },
-      }).then((r) => (r.ok ? r.json() : [])),
+      }).then((r) => (r.ok ? r.json() : { items: [] })),
+      fetch(
+        `${apiBaseUrl}/api/v1/chat-requests?role=recipient&status=pending&limit=50`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      ).then((r) => (r.ok ? r.json() : [])),
     ])
       .then(([convData, requests]) => {
         setConversations(convData.items ?? []);
         setPendingCount(
-          Array.isArray(requests) ? requests.filter((r: { status: string }) => r.status === "pending").length : 0,
+          Array.isArray(requests)
+            ? requests.filter((r: { status: string }) => r.status === "pending")
+                .length
+            : 0,
         );
       })
       .catch(() => setError("Failed to load inbox"))
@@ -102,7 +116,10 @@ export default function InboxPage() {
     const q = search.toLowerCase();
     const otherMember = c.members.find((m) => m.user.id !== user?.id);
     const name = otherMember?.user.display_name ?? "";
-    return name.toLowerCase().includes(q) || (c.listing_title ?? "").toLowerCase().includes(q);
+    return (
+      name.toLowerCase().includes(q) ||
+      (c.listing_title ?? "").toLowerCase().includes(q)
+    );
   });
 
   return (
@@ -111,7 +128,11 @@ export default function InboxPage() {
         <PageHeader
           eyebrow="Messages"
           title="Inbox"
-          subtitle={totalUnread > 0 ? `${totalUnread} unread` : "Your conversations with buyers and sellers"}
+          subtitle={
+            totalUnread > 0
+              ? `${totalUnread} unread`
+              : "Your conversations with buyers and sellers"
+          }
           actions={
             <Link
               href="/chat-requests"
@@ -130,7 +151,9 @@ export default function InboxPage() {
               }}
             >
               Chat Requests
-              {pendingCount > 0 && <Badge variant="danger" label={String(pendingCount)} />}
+              {pendingCount > 0 && (
+                <Badge variant="danger" label={String(pendingCount)} />
+              )}
             </Link>
           }
         />
@@ -151,12 +174,30 @@ export default function InboxPage() {
             >
               <span style={{ fontSize: 22 }}>⏳</span>
               <div style={{ flex: 1 }}>
-                <p style={{ margin: 0, fontWeight: font.weight.bold, color: colors.warningText, fontSize: font.size.base }}>
-                  {pendingCount} pending chat request{pendingCount !== 1 ? "s" : ""}
+                <p
+                  style={{
+                    margin: 0,
+                    fontWeight: font.weight.bold,
+                    color: colors.warningText,
+                    fontSize: font.size.base,
+                  }}
+                >
+                  {pendingCount} pending chat request
+                  {pendingCount !== 1 ? "s" : ""}
                 </p>
-                <p style={{ margin: 0, color: "#b45309", fontSize: font.size.sm }}>Tap to review and accept or decline</p>
+                <p
+                  style={{
+                    margin: 0,
+                    color: "#b45309",
+                    fontSize: font.size.sm,
+                  }}
+                >
+                  Tap to review and accept or decline
+                </p>
               </div>
-              <span style={{ color: "#b45309", fontWeight: font.weight.bold }}>→</span>
+              <span style={{ color: "#b45309", fontWeight: font.weight.bold }}>
+                →
+              </span>
             </div>
           </Link>
         )}
@@ -189,23 +230,46 @@ export default function InboxPage() {
         )}
 
         {loading ? (
-          <div style={{ display: "flex", justifyContent: "center", padding: 60 }}>
+          <div
+            style={{ display: "flex", justifyContent: "center", padding: 60 }}
+          >
             <Spinner size="md" />
           </div>
         ) : filtered.length === 0 ? (
           <EmptyState
             icon={<Icon.chat size={26} color={colors.primary} />}
-            title={search ? "No conversations match your search" : "No conversations yet"}
-            description={
-              search ? "Try a different search term." : "Browse listings and message sellers to start a conversation."
+            title={
+              search
+                ? "No conversations match your search"
+                : "No conversations yet"
             }
-            action={!search ? <LinkButton href="/search">Browse Listings</LinkButton> : undefined}
+            description={
+              search
+                ? "Try a different search term."
+                : "Browse listings and message sellers to start a conversation."
+            }
+            action={
+              !search ? (
+                <LinkButton href="/search">Browse Listings</LinkButton>
+              ) : undefined
+            }
           />
         ) : (
-          <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: radius.xl, overflow: "hidden" }}>
+          <div
+            style={{
+              background: colors.surface,
+              border: `1px solid ${colors.border}`,
+              borderRadius: radius.xl,
+              overflow: "hidden",
+            }}
+          >
             {filtered.map((conv, i) => {
-              const otherMember = conv.members.find((m) => m.user.id !== user?.id);
-              const otherName = otherMember?.user.display_name ?? `User ${otherMember?.user.id?.slice(0, 8) ?? "?"}`;
+              const otherMember = conv.members.find(
+                (m) => m.user.id !== user?.id,
+              );
+              const otherName =
+                otherMember?.user.display_name ??
+                `User ${otherMember?.user.id?.slice(0, 8) ?? "?"}`;
               const isUnread = conv.unread_count > 0;
 
               return (
@@ -218,35 +282,95 @@ export default function InboxPage() {
                     alignItems: "center",
                     gap: 14,
                     padding: "14px 18px",
-                    borderBottom: i < filtered.length - 1 ? `1px solid ${colors.divider}` : "none",
+                    borderBottom:
+                      i < filtered.length - 1
+                        ? `1px solid ${colors.divider}`
+                        : "none",
                     background: isUnread ? colors.primarySoft : colors.surface,
                   }}
                 >
                   <Avatar name={otherName} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 2 }}>
-                      <span style={{ fontWeight: isUnread ? font.weight.bold : font.weight.semibold, fontSize: font.size.base, color: colors.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 8,
+                        marginBottom: 2,
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontWeight: isUnread
+                            ? font.weight.bold
+                            : font.weight.semibold,
+                          fontSize: font.size.base,
+                          color: colors.text,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
                         {otherName}
                       </span>
-                      <span style={{ color: colors.textFaint, fontSize: font.size.xs, flexShrink: 0 }}>
+                      <span
+                        style={{
+                          color: colors.textFaint,
+                          fontSize: font.size.xs,
+                          flexShrink: 0,
+                        }}
+                      >
                         {timeAgo(conv.last_message_at ?? conv.created_at)}
                       </span>
                     </div>
                     {conv.listing_title && (
-                      <p style={{ margin: "0 0 2px", fontSize: font.size.xs, color: colors.primary, fontWeight: font.weight.semibold, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <p
+                        style={{
+                          margin: "0 0 2px",
+                          fontSize: font.size.xs,
+                          color: colors.primary,
+                          fontWeight: font.weight.semibold,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
                         {conv.listing_title}
                       </p>
                     )}
-                    <p style={{ margin: 0, fontSize: font.size.sm, color: isUnread ? colors.textMuted : colors.textSubtle, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: isUnread ? font.weight.medium : font.weight.normal }}>
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: font.size.sm,
+                        color: isUnread ? colors.textMuted : colors.textSubtle,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        fontWeight: isUnread
+                          ? font.weight.medium
+                          : font.weight.normal,
+                      }}
+                    >
                       {conv.last_message_preview ?? "Start of conversation"}
                     </p>
                   </div>
                   {isUnread && (
-                    <div style={{
-                      width: 22, height: 22, borderRadius: "50%", background: colors.primary,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      color: "#fff", fontSize: font.size.xs, fontWeight: font.weight.heavy, flexShrink: 0,
-                    }}>
+                    <div
+                      style={{
+                        width: 22,
+                        height: 22,
+                        borderRadius: "50%",
+                        background: colors.primary,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "#fff",
+                        fontSize: font.size.xs,
+                        fontWeight: font.weight.heavy,
+                        flexShrink: 0,
+                      }}
+                    >
                       {conv.unread_count > 9 ? "9+" : conv.unread_count}
                     </div>
                   )}

@@ -20,10 +20,26 @@ depends_on: str | Sequence[str] | None = None
 
 def upgrade() -> None:
     op.add_column("transactions", sa.Column("cancellation_reason", sa.String(500), nullable=True))
-    op.add_column("transactions", sa.Column("cancelled_by_user_id", sa.Integer(), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True))
-    op.add_column("transactions", sa.Column("cancelled_at", sa.DateTime(timezone=True), nullable=True))
-    op.add_column("transactions", sa.Column("buyer_marked_received_at", sa.DateTime(timezone=True), nullable=True))
-    op.add_column("transactions", sa.Column("seller_marked_delivered_at", sa.DateTime(timezone=True), nullable=True))
+    op.add_column(
+        "transactions",
+        sa.Column(
+            "cancelled_by_user_id",
+            sa.Integer(),
+            sa.ForeignKey("users.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
+    )
+    op.add_column(
+        "transactions", sa.Column("cancelled_at", sa.DateTime(timezone=True), nullable=True)
+    )
+    op.add_column(
+        "transactions",
+        sa.Column("buyer_marked_received_at", sa.DateTime(timezone=True), nullable=True),
+    )
+    op.add_column(
+        "transactions",
+        sa.Column("seller_marked_delivered_at", sa.DateTime(timezone=True), nullable=True),
+    )
 
 
 def downgrade() -> None:

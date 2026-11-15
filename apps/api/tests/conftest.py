@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import io
 from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any, cast
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from PIL import Image
 from pydantic import SecretStr
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -39,11 +41,41 @@ from oldpages_api.trust import models as _trust_models  # noqa: F401
 RegisterUser = Callable[..., Awaitable[dict[str, Any]]]
 
 
+def sample_jpeg() -> bytes:
+    out = io.BytesIO()
+    Image.new("RGB", (8, 8), "white").save(out, "JPEG")
+    return out.getvalue()
+
+
+@pytest.fixture(autouse=True)
+def stub_object_storage(monkeypatch: pytest.MonkeyPatch) -> dict[str, bytes]:
+    """Tests have no MinIO: keep objects in a dict; a completed upload is a small JPEG."""
+    stored: dict[str, bytes] = {}
+
+    async def _read(settings: Settings, storage_key: str, *, max_bytes: int) -> bytes | None:
+        data = stored.get(storage_key, sample_jpeg())
+        if len(data) > max_bytes:
+            raise ValueError("object too large")
+        return data
+
+    async def _write(settings: Settings, storage_key: str, data: bytes, content_type: str) -> None:
+        stored[storage_key] = data
+
+    async def _delete(settings: Settings, storage_key: str) -> None:
+        stored.pop(storage_key, None)
+
+    monkeypatch.setattr("oldpages_api.listings.service.read_object", _read)
+    monkeypatch.setattr("oldpages_api.listings.service.write_object", _write)
+    monkeypatch.setattr("oldpages_api.listings.service.delete_object", _delete)
+    return stored
+
+
 @pytest.fixture
 def test_settings() -> Settings:
     return Settings(
         environment="test",
         expose_development_auth_tokens=True,
+        auth_rate_limit_enabled=False,
         jwt_secret_key=SecretStr("test-secret-key-that-is-at-least-32-bytes"),
         otel_enabled=False,
     )

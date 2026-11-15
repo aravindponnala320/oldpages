@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
+from dataclasses import dataclass
+from datetime import datetime
 
-from sqlalchemy import Select, and_, func, literal_column, or_, select
+from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.base import ExecutableOption
-from sqlalchemy.types import UserDefinedType
 
 from oldpages_api.catalog.models import (
     AcademicMetadata,
@@ -38,65 +38,84 @@ from oldpages_api.search.models import (
     SearchQueryLog,
     WishlistItem,
 )
+from oldpages_api.search.query import (
+    after_cursor,
+    decode_cursor,
+    encode_cursor,
+    favorite_totals,
+    search_base,
+    search_conditions,
+    sort_order,
+)
 from oldpages_api.search.schemas import ListingSearchFilters
 
 
-class Geography(UserDefinedType[Any]):
-    cache_ok = True
-
-    def get_col_spec(self, **kw: Any) -> str:  # noqa: ANN401
-        return "geography"
-
-
-# Common Indian city name aliases (English ↔ local). Lookups in either direction
-# should also match the other; searching "Bangalore" should return "Bengaluru"
-# listings, and vice-versa. Extend this list as more cities appear.
-_CITY_ALIAS_GROUPS: tuple[tuple[str, ...], ...] = (
-    ("bangalore", "bengaluru"),
-    ("bombay", "mumbai"),
-    ("madras", "chennai"),
-    ("calcutta", "kolkata"),
-    ("cochin", "kochi"),
-    ("trivandrum", "thiruvananthapuram"),
-    ("pondicherry", "puducherry"),
-    ("gurgaon", "gurugram"),
-    ("mysore", "mysuru"),
-    ("mangalore", "mangaluru"),
-    ("baroda", "vadodara"),
-    ("poona", "pune"),
-    ("simla", "shimla"),
-    ("benares", "banaras", "varanasi"),
-    ("cawnpore", "kanpur"),
-)
-
-CITY_ALIASES: dict[str, tuple[str, ...]] = {
-    alias: group for group in _CITY_ALIAS_GROUPS for alias in group
-}
-
-
-def expand_city_aliases(value: str) -> tuple[str, ...]:
-    """Return the input plus any alternate spellings from CITY_ALIASES."""
-    key = value.strip().lower()
-    return CITY_ALIASES.get(key, (key,))
+@dataclass(frozen=True, slots=True)
+class SearchPage:
+    listings: list[Listing]
+    favorite_counts: dict[int, int]
+    next_cursor: str | None
+    total: int
 
 
 class SearchRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def search_listing_candidates(self, filters: ListingSearchFilters) -> list[Listing]:
-        stmt = base_listing_query().where(
-            Listing.status == "active",
-            Listing.deleted_at.is_(None),
-            ListingInventory.quantity_available > 0,
-            Listing.visibility == "public",
+    async def search_listing_page(self, filters: ListingSearchFilters) -> SearchPage:
+        dialect = self.dialect_name
+        conditions = search_conditions(filters, dialect)
+        favorites_table = favorite_totals()
+        favorites = func.coalesce(favorites_table.c.total, 0)
+        sort_value, descending = sort_order(filters, favorites, dialect)
+
+        stmt = (
+            search_base(Listing.id, sort_value.label("sort_value"))
+            .outerjoin(favorites_table, favorites_table.c.listing_id == Listing.id)
+            .where(*conditions)
         )
-        stmt = apply_text_filters(stmt, filters)
-        stmt = apply_structured_filters(stmt, filters)
-        if self.dialect_name == "postgresql":
-            stmt = apply_postgis_radius_filter(stmt, filters)
-        result = await self.session.execute(stmt)
-        return list(result.unique().scalars().all())
+        total: int | None = None  # counted once, on the first page
+        if filters.cursor:
+            value, listing_id, total = decode_cursor(filters.cursor, filters.sort)
+            stmt = stmt.where(after_cursor(sort_value, descending, value, listing_id))
+        if descending:
+            stmt = stmt.order_by(sort_value.desc(), Listing.id.desc())
+        else:
+            stmt = stmt.order_by(sort_value.asc(), Listing.id.asc())
+        rows = (await self.session.execute(stmt.limit(filters.limit + 1))).all()
+
+        if total is None:
+            total = await self.count_matching(filters)
+        next_cursor = None
+        if len(rows) > filters.limit:
+            rows = rows[: filters.limit]
+            last_id, last_value = rows[-1]
+            next_cursor = encode_cursor(filters.sort, last_value, last_id, total)
+        ids = [row[0] for row in rows]
+        return SearchPage(
+            listings=await self.listings_in_order(ids),
+            favorite_counts=await self.favorite_counts(ids),
+            next_cursor=next_cursor,
+            total=total,
+        )
+
+    async def count_matching(
+        self, filters: ListingSearchFilters, published_after: datetime | None = None
+    ) -> int:
+        matching = search_base(Listing.id).where(*search_conditions(filters, self.dialect_name))
+        if published_after is not None:
+            matching = matching.where(Listing.published_at > published_after)
+        total = await self.session.scalar(select(func.count()).select_from(matching.subquery()))
+        return int(total or 0)
+
+    async def listings_in_order(self, ids: Sequence[int]) -> list[Listing]:
+        if not ids:
+            return []
+        result = await self.session.execute(
+            select(Listing).options(*search_listing_load_options()).where(Listing.id.in_(ids))
+        )
+        by_id = {listing.id: listing for listing in result.scalars().all()}
+        return [by_id[listing_id] for listing_id in ids if listing_id in by_id]
 
     async def favorite_counts(self, listing_ids: Sequence[int]) -> dict[int, int]:
         if not listing_ids:
@@ -114,7 +133,7 @@ class SearchRepository:
         suggestions: list[tuple[str, str]] = []
         seen: set[tuple[str, str]] = set()
 
-        async def collect(stmt: Select[tuple[str]], suggestion_type: str) -> None:
+        async def collect(stmt: Select[str], suggestion_type: str) -> None:
             if len(suggestions) >= limit:
                 return
             result = await self.session.execute(stmt.limit(limit))
@@ -266,143 +285,6 @@ class SearchRepository:
     @property
     def dialect_name(self) -> str:
         return self.session.get_bind().dialect.name
-
-
-def base_listing_query() -> Select[tuple[Listing]]:
-    return (
-        select(Listing)
-        .join(ListingLocation, ListingLocation.listing_id == Listing.id)
-        .join(ListingInventory, ListingInventory.listing_id == Listing.id)
-        .join(BookEdition, BookEdition.id == Listing.book_edition_id)
-        .join(Book, Book.id == BookEdition.book_id)
-        .outerjoin(ListingCondition, ListingCondition.listing_id == Listing.id)
-        .outerjoin(ListingDeliveryMethod, ListingDeliveryMethod.listing_id == Listing.id)
-        .outerjoin(BookIdentifier, BookIdentifier.book_edition_id == BookEdition.id)
-        .outerjoin(Publisher, Publisher.id == BookEdition.publisher_id)
-        .outerjoin(AcademicMetadata, AcademicMetadata.book_edition_id == BookEdition.id)
-        .outerjoin(BookAuthor, BookAuthor.book_id == Book.id)
-        .outerjoin(Author, Author.id == BookAuthor.author_id)
-        .outerjoin(BookCategory, BookCategory.book_id == Book.id)
-        .outerjoin(Category, Category.id == BookCategory.category_id)
-        .options(*search_listing_load_options())
-    )
-
-
-def apply_text_filters(
-    stmt: Select[tuple[Listing]],
-    filters: ListingSearchFilters,
-) -> Select[tuple[Listing]]:
-    if filters.q:
-        needle = f"%{filters.q.lower()}%"
-        # If the query is a known city alias, also match its alternate spellings
-        # (e.g. searching "Bangalore" also matches "Bengaluru").
-        city_needles = tuple(f"%{alias}%" for alias in expand_city_aliases(filters.q))
-        city_or_state_clauses = [
-            lower_contains(ListingLocation.city, alias) for alias in city_needles
-        ] + [lower_contains(ListingLocation.state, alias) for alias in city_needles]
-        stmt = stmt.where(
-            or_(
-                lower_contains(Listing.title_snapshot, needle),
-                lower_contains(Listing.description, needle),
-                lower_contains(BookEdition.title, needle),
-                lower_contains(BookEdition.subtitle, needle),
-                lower_contains(BookEdition.description, needle),
-                lower_contains(Book.title, needle),
-                lower_contains(Book.subtitle, needle),
-                lower_contains(Author.name, needle),
-                lower_contains(BookIdentifier.identifier_value, needle),
-                lower_contains(Publisher.name, needle),
-                lower_contains(Category.name, needle),
-                lower_contains(Category.slug, needle),
-                lower_contains(AcademicMetadata.school_board, needle),
-                lower_contains(AcademicMetadata.college, needle),
-                lower_contains(AcademicMetadata.university, needle),
-                lower_contains(AcademicMetadata.course, needle),
-                lower_contains(AcademicMetadata.exam, needle),
-                *city_or_state_clauses,
-                lower_contains(ListingLocation.neighborhood, needle),
-                lower_contains(ListingLocation.public_area, needle),
-                lower_contains(ListingLocation.country, needle),
-            )
-        )
-    if filters.isbn:
-        needle = f"%{filters.isbn.lower().replace('-', '').replace(' ', '')}%"
-        stmt = stmt.where(lower_contains(BookIdentifier.identifier_value, needle))
-    return stmt
-
-
-def apply_structured_filters(
-    stmt: Select[tuple[Listing]],
-    filters: ListingSearchFilters,
-) -> Select[tuple[Listing]]:
-    if filters.min_price_amount_cents is not None:
-        stmt = stmt.where(Listing.price_amount_cents >= filters.min_price_amount_cents)
-    if filters.max_price_amount_cents is not None:
-        stmt = stmt.where(Listing.price_amount_cents <= filters.max_price_amount_cents)
-    if filters.free_only:
-        stmt = stmt.where(
-            or_(Listing.price_amount_cents.is_(None), Listing.price_amount_cents == 0)
-        )
-    if filters.city:
-        needles = tuple(f"%{alias}%" for alias in expand_city_aliases(filters.city))
-        stmt = stmt.where(
-            or_(*(lower_contains(ListingLocation.city, alias) for alias in needles))
-        )
-    if filters.state:
-        stmt = stmt.where(lower_contains(ListingLocation.state, f"%{filters.state.lower()}%"))
-    if filters.country:
-        stmt = stmt.where(lower_contains(ListingLocation.country, f"%{filters.country.lower()}%"))
-    if filters.condition:
-        stmt = stmt.where(ListingCondition.condition == filters.condition)
-    if filters.language:
-        stmt = stmt.where(BookEdition.language == filters.language)
-    if filters.category:
-        needle = f"%{filters.category.lower()}%"
-        stmt = stmt.where(
-            or_(lower_contains(Category.slug, needle), lower_contains(Category.name, needle))
-        )
-    if filters.author:
-        stmt = stmt.where(lower_contains(Author.name, f"%{filters.author.lower()}%"))
-    if filters.publisher:
-        stmt = stmt.where(lower_contains(Publisher.name, f"%{filters.publisher.lower()}%"))
-    if filters.publication_year is not None:
-        stmt = stmt.where(BookEdition.publication_year == filters.publication_year)
-    if filters.format:
-        stmt = stmt.where(BookEdition.format == filters.format)
-    if filters.negotiable is not None:
-        stmt = stmt.where(Listing.negotiable.is_(filters.negotiable))
-    if filters.campus_pickup is not None:
-        stmt = stmt.where(ListingLocation.campus_pickup.is_(filters.campus_pickup))
-    if filters.signed_copy is not None:
-        stmt = stmt.where(ListingCondition.signed_by_author.is_(filters.signed_copy))
-    if filters.first_edition is not None:
-        stmt = stmt.where(ListingCondition.first_edition.is_(filters.first_edition))
-    return stmt
-
-
-def apply_postgis_radius_filter(
-    stmt: Select[tuple[Listing]],
-    filters: ListingSearchFilters,
-) -> Select[tuple[Listing]]:
-    if filters.latitude is None or filters.longitude is None or filters.distance_km is None:
-        return stmt
-    origin_point = func.ST_SetSRID(
-        func.ST_MakePoint(filters.longitude, filters.latitude),
-        4326,
-    ).cast(Geography())
-    # Use the generated `geog` column added in migration 0022 so the GIST index is picked up.
-    listing_geog = literal_column("listing_locations.geog")
-    return stmt.where(
-        and_(
-            ListingLocation.public_latitude.is_not(None),
-            ListingLocation.public_longitude.is_not(None),
-            func.ST_DWithin(listing_geog, origin_point, filters.distance_km * 1000),
-        )
-    )
-
-
-def lower_contains(column: Any, needle: str) -> Any:  # noqa: ANN401
-    return func.lower(func.coalesce(column, "")).like(needle)
 
 
 def search_listing_load_options() -> tuple[ExecutableOption, ...]:

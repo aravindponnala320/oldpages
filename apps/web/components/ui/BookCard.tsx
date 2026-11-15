@@ -18,7 +18,13 @@ export type BookCardData = {
 };
 
 /** Renders a book card, used in grids across the app. */
-export function BookCard({ book, style }: { book: BookCardData; style?: CSSProperties }) {
+export function BookCard({
+  book,
+  style,
+}: {
+  book: BookCardData;
+  style?: CSSProperties;
+}) {
   return (
     <Link
       href={book.href}
@@ -35,8 +41,21 @@ export function BookCard({ book, style }: { book: BookCardData; style?: CSSPrope
         ...style,
       }}
     >
-      <BookCover imageUrl={book.imageUrl} title={book.title} seed={book.id} author={book.author} />
-      <div style={{ padding: "10px 12px 12px", display: "flex", flexDirection: "column", gap: 4, flex: 1 }}>
+      <BookCover
+        imageUrl={book.imageUrl}
+        title={book.title}
+        seed={book.id}
+        author={book.author}
+      />
+      <div
+        style={{
+          padding: "10px 12px 12px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 4,
+          flex: 1,
+        }}
+      >
         <h3
           style={{
             margin: 0,
@@ -79,14 +98,41 @@ export function BookCard({ book, style }: { book: BookCardData; style?: CSSPrope
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
+            gap: 8,
           }}
         >
-          <span style={{ fontSize: font.size.lg, fontWeight: font.weight.bold, color: colors.text }}>
+          <span
+            style={{
+              fontSize: font.size.lg,
+              fontWeight: font.weight.bold,
+              color: colors.text,
+              flexShrink: 0,
+            }}
+          >
             {book.priceLabel ?? ""}
           </span>
           {book.location && (
-            <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: font.size.xs, color: colors.textFaint }}>
-              <Icon.pin size={12} color={colors.textFaint} /> {book.location}
+            <span
+              title={book.location}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 3,
+                minWidth: 0,
+                fontSize: font.size.xs,
+                color: colors.textSubtle,
+              }}
+            >
+              <Icon.pin size={12} color={colors.textFaint} />
+              <span
+                style={{
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {book.location}
+              </span>
             </span>
           )}
         </div>
@@ -136,14 +182,26 @@ export function BookCover({
     >
       {imageUrl && !broken && (
         <img
+          loading="lazy"
+          decoding="async"
           src={imageUrl}
           alt={title}
           onError={() => setBroken(true)}
-          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            display: "block",
+          }}
         />
       )}
       {shouldShowPlaceholder && (
-        <Placeholder design={design} glyph={glyph} title={title} author={author ?? null} />
+        <Placeholder
+          design={design}
+          glyph={glyph}
+          title={title}
+          author={author ?? null}
+        />
       )}
       {overlay}
     </div>
@@ -164,22 +222,92 @@ type Design = {
 };
 
 const PALETTES: Omit<Design, "pattern" | "id">[] = [
-  { background: "linear-gradient(135deg, #5B21B6 0%, #7C3AED 100%)", text: "#F5F3FF", accent: "#C4B5FD", spineTone: "rgba(255,255,255,0.14)" },
-  { background: "linear-gradient(135deg, #0F766E 0%, #14B8A6 100%)", text: "#F0FDFA", accent: "#5EEAD4", spineTone: "rgba(255,255,255,0.14)" },
-  { background: "linear-gradient(135deg, #B91C1C 0%, #EF4444 100%)", text: "#FEF2F2", accent: "#FCA5A5", spineTone: "rgba(255,255,255,0.14)" },
-  { background: "linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%)", text: "#EFF6FF", accent: "#93C5FD", spineTone: "rgba(255,255,255,0.14)" },
-  { background: "linear-gradient(135deg, #92400E 0%, #F59E0B 100%)", text: "#FFFBEB", accent: "#FCD34D", spineTone: "rgba(0,0,0,0.14)" },
-  { background: "linear-gradient(135deg, #831843 0%, #EC4899 100%)", text: "#FDF2F8", accent: "#F9A8D4", spineTone: "rgba(255,255,255,0.14)" },
-  { background: "linear-gradient(135deg, #064E3B 0%, #10B981 100%)", text: "#ECFDF5", accent: "#6EE7B7", spineTone: "rgba(255,255,255,0.14)" },
-  { background: "linear-gradient(135deg, #4C1D95 0%, #6366F1 100%)", text: "#EEF2FF", accent: "#A5B4FC", spineTone: "rgba(255,255,255,0.14)" },
-  { background: "linear-gradient(135deg, #7C2D12 0%, #EA580C 100%)", text: "#FFF7ED", accent: "#FDBA74", spineTone: "rgba(0,0,0,0.12)" },
-  { background: "linear-gradient(135deg, #164E63 0%, #06B6D4 100%)", text: "#ECFEFF", accent: "#67E8F9", spineTone: "rgba(255,255,255,0.14)" },
-  { background: "linear-gradient(135deg, #365314 0%, #84CC16 100%)", text: "#F7FEE7", accent: "#BEF264", spineTone: "rgba(0,0,0,0.12)" },
-  { background: "linear-gradient(135deg, #1F2937 0%, #4B5563 100%)", text: "#F9FAFB", accent: "#D1D5DB", spineTone: "rgba(255,255,255,0.12)" },
+  {
+    background: "linear-gradient(135deg, #5B21B6 0%, #7C3AED 100%)",
+    text: "#F5F3FF",
+    accent: "#C4B5FD",
+    spineTone: "rgba(255,255,255,0.14)",
+  },
+  {
+    background: "linear-gradient(135deg, #0F766E 0%, #14B8A6 100%)",
+    text: "#F0FDFA",
+    accent: "#5EEAD4",
+    spineTone: "rgba(255,255,255,0.14)",
+  },
+  {
+    background: "linear-gradient(135deg, #B91C1C 0%, #EF4444 100%)",
+    text: "#FEF2F2",
+    accent: "#FCA5A5",
+    spineTone: "rgba(255,255,255,0.14)",
+  },
+  {
+    background: "linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%)",
+    text: "#EFF6FF",
+    accent: "#93C5FD",
+    spineTone: "rgba(255,255,255,0.14)",
+  },
+  {
+    background: "linear-gradient(135deg, #92400E 0%, #F59E0B 100%)",
+    text: "#FFFBEB",
+    accent: "#FCD34D",
+    spineTone: "rgba(0,0,0,0.14)",
+  },
+  {
+    background: "linear-gradient(135deg, #831843 0%, #EC4899 100%)",
+    text: "#FDF2F8",
+    accent: "#F9A8D4",
+    spineTone: "rgba(255,255,255,0.14)",
+  },
+  {
+    background: "linear-gradient(135deg, #064E3B 0%, #10B981 100%)",
+    text: "#ECFDF5",
+    accent: "#6EE7B7",
+    spineTone: "rgba(255,255,255,0.14)",
+  },
+  {
+    background: "linear-gradient(135deg, #4C1D95 0%, #6366F1 100%)",
+    text: "#EEF2FF",
+    accent: "#A5B4FC",
+    spineTone: "rgba(255,255,255,0.14)",
+  },
+  {
+    background: "linear-gradient(135deg, #7C2D12 0%, #EA580C 100%)",
+    text: "#FFF7ED",
+    accent: "#FDBA74",
+    spineTone: "rgba(0,0,0,0.12)",
+  },
+  {
+    background: "linear-gradient(135deg, #164E63 0%, #06B6D4 100%)",
+    text: "#ECFEFF",
+    accent: "#67E8F9",
+    spineTone: "rgba(255,255,255,0.14)",
+  },
+  {
+    background: "linear-gradient(135deg, #365314 0%, #84CC16 100%)",
+    text: "#F7FEE7",
+    accent: "#BEF264",
+    spineTone: "rgba(0,0,0,0.12)",
+  },
+  {
+    background: "linear-gradient(135deg, #1F2937 0%, #4B5563 100%)",
+    text: "#F9FAFB",
+    accent: "#D1D5DB",
+    spineTone: "rgba(255,255,255,0.12)",
+  },
 ];
 
 const PATTERNS: Design["pattern"][] = ["spine", "corner", "band", "dots"];
-const STOP_WORDS = new Set(["the", "a", "an", "of", "and", "in", "on", "to", "for"]);
+const STOP_WORDS = new Set([
+  "the",
+  "a",
+  "an",
+  "of",
+  "and",
+  "in",
+  "on",
+  "to",
+  "for",
+]);
 
 function pickDesign(seed: string): Design {
   const h = hash(seed);
@@ -279,7 +407,7 @@ function Placeholder({
       >
         <div
           style={{
-            fontSize: 11,
+            fontSize: 12,
             fontWeight: 700,
             textTransform: "uppercase",
             letterSpacing: "0.08em",

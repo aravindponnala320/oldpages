@@ -32,7 +32,11 @@ declare global {
   }
 }
 
-export function GoogleSignInButton({ redirectTo = "/dashboard" }: { redirectTo?: string }) {
+export function GoogleSignInButton({
+  redirectTo = "/dashboard",
+}: {
+  redirectTo?: string;
+}) {
   const { loginWithGoogle } = useAuth();
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -52,7 +56,9 @@ export function GoogleSignInButton({ redirectTo = "/dashboard" }: { redirectTo?:
             await loginWithGoogle(credential);
             router.push(redirectTo);
           } catch (err) {
-            setError(err instanceof Error ? err.message : "Google sign-in failed.");
+            setError(
+              err instanceof Error ? err.message : "Google sign-in failed.",
+            );
           }
         },
       });
@@ -62,7 +68,11 @@ export function GoogleSignInButton({ redirectTo = "/dashboard" }: { redirectTo?:
         shape: "rectangular",
         text: "continue_with",
         logo_alignment: "left",
-        width: 320,
+        // Google accepts 120–400px; fill the form column without overflowing small phones.
+        width: Math.max(
+          200,
+          Math.min(400, containerRef.current.clientWidth || 320),
+        ),
       });
     }
 
@@ -83,7 +93,10 @@ export function GoogleSignInButton({ redirectTo = "/dashboard" }: { redirectTo?:
 
   return (
     <div>
-      <div ref={containerRef} style={{ display: "flex", justifyContent: "center" }} />
+      <div
+        ref={containerRef}
+        style={{ display: "flex", justifyContent: "center" }}
+      />
       {error && (
         <div
           role="alert"

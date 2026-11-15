@@ -490,7 +490,7 @@ Listing for that book goes live → Worker detects →
 User follows seller:
   POST /follows {followee_id: "seller_xyz"}
 
-Seller adds new listing → 
+Seller adds new listing →
   🔔 Notification: "BookNook Store listed 3 new books"
 ```
 
@@ -566,7 +566,7 @@ Browser (Buyer)              FastAPI WebSocket           Browser (Seller)
       │   id: "db_id",              │  Fan-out to seller        │
       │   client_message_id: "m_1"} │  WebSocket connection     │
       │◀────────────────────────────│──────────────────────────▶│
-      │                             │                           │  
+      │                             │                           │
       │                             │  If seller offline:       │
       │                             │  INSERT notification      │
       │                             │  Queue push/email         │
@@ -620,7 +620,7 @@ Browser (Buyer)              FastAPI WebSocket           Browser (Seller)
 
 ```
 Content Safety Pipeline:
-  Message sent → 
+  Message sent →
     ├── Phone number pattern detect → Warn user
     ├── External link → Scan + warn
     ├── Spam phrase detection → Rate limit
@@ -2114,6 +2114,7 @@ EVENTS
 ## 20. API Endpoint Reference
 
 ### Authentication & Identity
+
 ```
 POST   /api/v1/auth/register            Register new user
 POST   /api/v1/auth/login               Login with email/password
@@ -2133,6 +2134,7 @@ DELETE /api/v1/users/me/sessions/{id}   Revoke session
 ```
 
 ### Catalog
+
 ```
 GET    /api/v1/books                    List/search books
 GET    /api/v1/books/{id}               Get book detail
@@ -2144,6 +2146,7 @@ GET    /api/v1/publishers               List publishers
 ```
 
 ### Listings & Media
+
 ```
 POST   /api/v1/listings                 Create listing
 GET    /api/v1/listings/{id}            Get listing
@@ -2157,6 +2160,7 @@ POST   /api/v1/media/{id}/complete      Mark upload complete
 ```
 
 ### Search & Discovery
+
 ```
 GET    /api/v1/search/listings          Search listings
 GET    /api/v1/search/suggestions       Autocomplete suggestions
@@ -2171,6 +2175,7 @@ DELETE /api/v1/follows/{id}             Unfollow
 ```
 
 ### Chat & Notifications
+
 ```
 POST   /api/v1/chat-requests            Send chat request
 GET    /api/v1/chat-requests            List chat requests
@@ -2188,6 +2193,7 @@ PATCH  /api/v1/notification-preferences Update preferences
 ```
 
 ### Commerce (Offers & Transactions)
+
 ```
 POST   /api/v1/offers                   Make offer
 GET    /api/v1/offers                   List offers (buyer/seller)
@@ -2204,6 +2210,7 @@ POST   /api/v1/reviews                  Leave review
 ```
 
 ### Payments & Shipping
+
 ```
 POST   /api/v1/carts                    Create cart
 GET    /api/v1/carts/{id}               Get cart
@@ -2226,6 +2233,7 @@ POST   /api/v1/disputes/{id}/resolve    Resolve dispute
 ```
 
 ### Trust & Moderation
+
 ```
 POST   /api/v1/reports                  Submit report
 POST   /api/v1/reports/{id}/appeal      Appeal decision
@@ -2238,6 +2246,7 @@ GET    /api/v1/admin/conversations/{id}/evidence  Chat evidence
 ```
 
 ### Communities
+
 ```
 POST   /api/v1/communities              Create community
 GET    /api/v1/communities              Discover communities
@@ -2252,6 +2261,7 @@ POST   /api/v1/posts/{id}/reactions    React to post
 ```
 
 ### Book Clubs & Events
+
 ```
 POST   /api/v1/clubs                    Create book club
 GET    /api/v1/clubs                    List clubs
@@ -2274,6 +2284,7 @@ POST   /api/v1/reading/milestones       Create milestone
 ```
 
 ### Reading Tracker
+
 ```
 POST   /api/v1/reading/shelves          Create shelf
 GET    /api/v1/reading/shelves/me       List my shelves
@@ -2291,6 +2302,7 @@ POST   /api/v1/reading/statistics/recompute  Recompute stats
 ```
 
 ### Institutions & Donations
+
 ```
 POST   /api/v1/institutions             Create institution
 GET    /api/v1/institutions             List institutions
@@ -2315,6 +2327,7 @@ GET    /api/v1/donations/pledges/me     My pledges
 ```
 
 ### Business & Subscriptions
+
 ```
 POST   /api/v1/business                 Create business profile
 GET    /api/v1/business                 List profiles
@@ -2340,6 +2353,7 @@ POST   /api/v1/coupons/validate        Validate coupon
 ```
 
 ### Recommendations
+
 ```
 GET    /api/v1/recommendations                     My recommendations
 POST   /api/v1/recommendations/refresh             Trigger refresh
@@ -2352,6 +2366,7 @@ GET    /api/v1/listings/{id}/similar               Similar listings
 ```
 
 ### Health
+
 ```
 GET    /health/live     Liveness probe (is API running?)
 GET    /health/ready    Readiness probe (DB + Redis connected?)
@@ -2463,65 +2478,65 @@ RECOMMENDATIONS (2 tables)
 
 ### Features by Milestone
 
-| Milestone | Name | Status | Migrations |
-|---|---|---|---|
-| M0 | Foundation (monorepo, Docker, CI) | ✅ Done | 0001 |
-| M1 | Identity & Profiles | ✅ Done | 0002 |
-| M2 | Book Catalog | ✅ Done | 0003 |
-| M3 | Listings & Media | ✅ Done | 0004 |
-| M4 | Search & Discovery | ✅ Done | 0005 |
-| M5 | Chat & Notifications | ✅ Done | 0006 |
-| M6 | Offers, Pickup & Reviews | ✅ Done | 0007 |
-| M7 | Trust, Reports & Moderation | ✅ Done | 0008 |
-| M8 | Communities | ✅ Done | 0009 |
-| M9 | Book Clubs, Buddy Reads & Events | ✅ Done | 0010 |
-| M10 | Reading Tracker | ✅ Done | 0011 |
-| M11 | Payments, Orders & Shipping | ✅ Done | 0012 |
-| M12 | Professional Sellers & Monetization | ✅ Done | 0014 |
-| M13 | Institutions & Donations | ✅ Done | 0013 |
-| M14 | Recommendations & AI | ✅ Done | 0015 |
+| Milestone | Name                                | Status  | Migrations |
+| --------- | ----------------------------------- | ------- | ---------- |
+| M0        | Foundation (monorepo, Docker, CI)   | ✅ Done | 0001       |
+| M1        | Identity & Profiles                 | ✅ Done | 0002       |
+| M2        | Book Catalog                        | ✅ Done | 0003       |
+| M3        | Listings & Media                    | ✅ Done | 0004       |
+| M4        | Search & Discovery                  | ✅ Done | 0005       |
+| M5        | Chat & Notifications                | ✅ Done | 0006       |
+| M6        | Offers, Pickup & Reviews            | ✅ Done | 0007       |
+| M7        | Trust, Reports & Moderation         | ✅ Done | 0008       |
+| M8        | Communities                         | ✅ Done | 0009       |
+| M9        | Book Clubs, Buddy Reads & Events    | ✅ Done | 0010       |
+| M10       | Reading Tracker                     | ✅ Done | 0011       |
+| M11       | Payments, Orders & Shipping         | ✅ Done | 0012       |
+| M12       | Professional Sellers & Monetization | ✅ Done | 0014       |
+| M13       | Institutions & Donations            | ✅ Done | 0013       |
+| M14       | Recommendations & AI                | ✅ Done | 0015       |
 
 ### Totals
 
-| Category | Count |
-|---|---|
-| Database Tables | 103+ |
-| Alembic Migrations | 15 |
-| Backend API Endpoints | ~156 |
-| Frontend Pages (Web) | 34 |
-| Frontend Pages (Admin) | 12 |
-| Shared UI Components | 10 |
-| Background Job Types | 8 |
-| Domain Event Types | 32 |
-| State Machines | 10 |
-| Notification Types | 20 |
+| Category               | Count |
+| ---------------------- | ----- |
+| Database Tables        | 103+  |
+| Alembic Migrations     | 15    |
+| Backend API Endpoints  | ~156  |
+| Frontend Pages (Web)   | 34    |
+| Frontend Pages (Admin) | 12    |
+| Shared UI Components   | 10    |
+| Background Job Types   | 8     |
+| Domain Event Types     | 32    |
+| State Machines         | 10    |
+| Notification Types     | 20    |
 
 ### Service URLs (Local Development)
 
-| Service | URL | Purpose |
-|---|---|---|
-| API | http://localhost:8000 | FastAPI backend |
-| API Docs | http://localhost:8000/docs | Interactive OpenAPI |
-| API Health | http://localhost:8000/health/ready | Health check |
-| Web App | http://localhost:3000 | Public Next.js frontend |
-| Admin App | http://localhost:3001 | Admin Next.js frontend |
-| MinIO Console | http://localhost:9001 | Object storage UI |
-| PostgreSQL | localhost:5432 | Database (user: oldpages) |
-| Redis | localhost:6379 | Cache & pub/sub |
+| Service       | URL                                | Purpose                   |
+| ------------- | ---------------------------------- | ------------------------- |
+| API           | http://localhost:8000              | FastAPI backend           |
+| API Docs      | http://localhost:8000/docs         | Interactive OpenAPI       |
+| API Health    | http://localhost:8000/health/ready | Health check              |
+| Web App       | http://localhost:3000              | Public Next.js frontend   |
+| Admin App     | http://localhost:3001              | Admin Next.js frontend    |
+| MinIO Console | http://localhost:9001              | Object storage UI         |
+| PostgreSQL    | localhost:5432                     | Database (user: oldpages) |
+| Redis         | localhost:6379                     | Cache & pub/sub           |
 
 ### Key Architectural Decisions
 
-| Decision | Choice | Reason |
-|---|---|---|
-| Architecture | Modular Monolith | Ship fast, extract later |
-| Database | PostgreSQL + PostGIS | Location queries, JSON, reliability |
-| Search | PostgreSQL FTS + Trigram | No external service dependency |
-| Payments | Provider abstraction | Swap Razorpay/Stripe without code change |
-| Shipping | Provider abstraction | Swap Shiprocket/Delhivery easily |
-| Auth tokens | JWT (short) + Refresh (rotating) | Security + UX balance |
-| Location privacy | PostGIS geohash for public | Never expose exact home address |
-| Events | Transactional outbox | Reliable event delivery |
-| Idempotency | DB unique keys | Safe payment/order retries |
-| Reviews | Transaction-linked | Prevent fake reviews |
-| Media | Direct-to-storage upload | No API bottleneck for large files |
-| Real-time | WebSocket + Redis pub/sub | Stateless API, scalable |
+| Decision         | Choice                           | Reason                                   |
+| ---------------- | -------------------------------- | ---------------------------------------- |
+| Architecture     | Modular Monolith                 | Ship fast, extract later                 |
+| Database         | PostgreSQL + PostGIS             | Location queries, JSON, reliability      |
+| Search           | PostgreSQL FTS + Trigram         | No external service dependency           |
+| Payments         | Provider abstraction             | Swap Razorpay/Stripe without code change |
+| Shipping         | Provider abstraction             | Swap Shiprocket/Delhivery easily         |
+| Auth tokens      | JWT (short) + Refresh (rotating) | Security + UX balance                    |
+| Location privacy | PostGIS geohash for public       | Never expose exact home address          |
+| Events           | Transactional outbox             | Reliable event delivery                  |
+| Idempotency      | DB unique keys                   | Safe payment/order retries               |
+| Reviews          | Transaction-linked               | Prevent fake reviews                     |
+| Media            | Direct-to-storage upload         | No API bottleneck for large files        |
+| Real-time        | WebSocket + Redis pub/sub        | Stateless API, scalable                  |

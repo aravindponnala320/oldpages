@@ -11,7 +11,7 @@ const AUTH_PATHS = ["/login", "/register", "/forgot-password"];
  * (chat threads, order flows, listing wizards) benefit from more vertical room.
  */
 const HIDE_BOTTOM_NAV_PREFIXES = [
-  "/inbox/",       // full-screen chat threads (bottom nav collides with input bar)
+  "/inbox/", // full-screen chat threads (bottom nav collides with input bar)
 ];
 
 /**
@@ -23,11 +23,11 @@ export function ConditionalShell({ children }: { children: ReactNode }) {
   const isAuth = AUTH_PATHS.some((p) => pathname.startsWith(p));
   if (isAuth) return <>{children}</>;
 
-  const isFullscreen =
-    HIDE_BOTTOM_NAV_PREFIXES.some((prefix) => {
-      if (prefix.endsWith("/")) return pathname.startsWith(prefix) && pathname !== prefix.slice(0, -1);
-      return pathname.startsWith(prefix);
-    });
+  const isFullscreen = HIDE_BOTTOM_NAV_PREFIXES.some((prefix) => {
+    if (prefix.endsWith("/"))
+      return pathname.startsWith(prefix) && pathname !== prefix.slice(0, -1);
+    return pathname.startsWith(prefix);
+  });
 
   return <AppShell hideBottomNav={isFullscreen}>{children}</AppShell>;
 }

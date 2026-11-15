@@ -3,16 +3,16 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
 ListingScope = Literal["personal", "business", "institution"]
 ListingVisibility = Literal["public", "private", "business_only", "institution_only"]
 
 VISIBILITY_BY_SCOPE: dict[str, list[str]] = {
-    "personal":    ["public", "private"],
-    "business":    ["public", "business_only"],
+    "personal": ["public", "private"],
+    "business": ["public", "business_only"],
     "institution": ["public", "institution_only"],
 }
-
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 ListingMode = Literal[
     "sell",
@@ -102,6 +102,7 @@ class ListingImageInput(BaseModel):
 
 class ListingCreateRequest(BaseModel):
     book_id: str | None = Field(default=None, max_length=26)
+    category: str | None = Field(default=None, max_length=180)  # slug from the category tree
     isbn: str | None = Field(default=None, max_length=32)
     book_title: str | None = Field(default=None, max_length=500)
     book_author: str | None = Field(default=None, max_length=240)
@@ -121,7 +122,7 @@ class ListingCreateRequest(BaseModel):
     rental_fee_per_day_cents: int | None = Field(default=None, ge=0)
     rental_deposit_amount_cents: int | None = Field(default=None, ge=0)
     quantity: int = Field(default=1, ge=1)
-    condition: ListingConditionInput
+    condition: ListingConditionInput | None = None
     location: ListingLocationInput
     delivery_methods: list[ListingDeliveryMethodInput] = Field(default_factory=list, max_length=2)
     images: list[ListingImageInput] = Field(default_factory=list, max_length=12)
@@ -144,6 +145,8 @@ class ListingCreateRequest(BaseModel):
     def validate_business_rules(self) -> ListingCreateRequest:
         if not self.book_id and not self.isbn and not self.book_title:
             raise ValueError("Either book_id, isbn, or book_title is required.")
+        if self.condition is None and set(self.listing_modes) != {"request"}:
+            raise ValueError("Condition details are required unless the listing is a request.")
         validate_price_rules(self.listing_modes, self.price_amount_cents)
         allowed = VISIBILITY_BY_SCOPE.get(self.scope, [])
         if self.visibility not in allowed:
@@ -159,6 +162,7 @@ class ListingCreateRequest(BaseModel):
 
 
 class ListingUpdateRequest(BaseModel):
+    category: str | None = Field(default=None, max_length=180)  # null clears it
     listing_modes: list[ListingMode] | None = Field(default=None, min_length=1, max_length=4)
     description: str | None = Field(default=None, max_length=8000)
     price_amount_cents: int | None = Field(default=None, ge=0)
@@ -271,10 +275,16 @@ class ListingSellerSummary(BaseModel):
     id: str
 
 
+class ListingCategorySummary(BaseModel):
+    name: str
+    slug: str
+
+
 class ListingResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     book: ListingBookSummary
+    category: ListingCategorySummary | None = None
     condition: ListingConditionResponse | None
     created_at: datetime
     currency: str
@@ -310,4 +320,4 @@ def validate_price_rules(modes: list[ListingMode], price_amount_cents: int | Non
     if mode_set & PRICE_REQUIRED_MODES and price_amount_cents is None:
         raise ValueError("Price is required for sell, sell-exchange, rent, and bulk-sale listings.")
     if mode_set <= PRICELESS_MODES and price_amount_cents not in {None, 0}:
-        raise ValueError("Donate, giveaway, and request listings cannot have a sale price.")
+        raise ValueError("Donate and request listings cannot have a sale price.")

@@ -15,7 +15,15 @@ type Props = {
  * Section: a self-contained card panel with an optional title row.
  * Use for grouping related content on a page (e.g. "Nearby Books", "Recent Orders").
  */
-export function Section({ title, subtitle, eyebrow, icon, actions, children, padded = true }: Props) {
+export function Section({
+  title,
+  subtitle,
+  eyebrow,
+  icon,
+  actions,
+  children,
+  padded = true,
+}: Props) {
   const hasHeader = !!(title || eyebrow || actions);
   return (
     <section
@@ -30,7 +38,9 @@ export function Section({ title, subtitle, eyebrow, icon, actions, children, pad
       {hasHeader && (
         <header
           style={{
-            padding: padded ? "18px 20px 12px" : "16px 16px 12px",
+            padding: padded
+              ? "18px clamp(14px, 3vw, 20px) 12px"
+              : "16px 16px 12px",
             display: "flex",
             alignItems: "flex-start",
             justifyContent: "space-between",
@@ -80,10 +90,16 @@ export function Section({ title, subtitle, eyebrow, icon, actions, children, pad
               </p>
             )}
           </div>
-          {actions && <div style={{ display: "flex", alignItems: "center", gap: 8 }}>{actions}</div>}
+          {actions && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {actions}
+            </div>
+          )}
         </header>
       )}
-      <div style={{ padding: padded ? "8px 20px 20px" : 0 }}>{children}</div>
+      <div style={{ padding: padded ? "8px clamp(14px, 3vw, 20px) 20px" : 0 }}>
+        {children}
+      </div>
     </section>
   );
 }

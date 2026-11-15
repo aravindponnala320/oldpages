@@ -72,7 +72,14 @@ export default function FavoritesPage() {
 
   if (isLoading || loading) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: "60vh",
+        }}
+      >
         <Spinner size="lg" />
       </div>
     );
@@ -85,7 +92,11 @@ export default function FavoritesPage() {
           eyebrow="Your library"
           title="Saved Listings"
           subtitle={`${favorites.length} saved listing${favorites.length !== 1 ? "s" : ""}`}
-          actions={<LinkButton href="/search" variant="secondary">Browse Books</LinkButton>}
+          actions={
+            <LinkButton href="/search" variant="secondary">
+              Browse Books
+            </LinkButton>
+          }
         />
 
         {favorites.length === 0 ? (
@@ -96,11 +107,20 @@ export default function FavoritesPage() {
             action={<LinkButton href="/search">Browse Listings</LinkButton>}
           />
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 16 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns:
+                "repeat(auto-fill, minmax(min(100%, clamp(120px, 22vw, 200px)), 1fr))",
+              gap: 16,
+            }}
+          >
             {favorites.map((listing) => (
               <div key={listing.id} style={{ position: "relative" }}>
                 <BookCard book={toBookCard(listing)} />
-                <div style={{ position: "absolute", top: 8, right: 8, zIndex: 2 }}>
+                <div
+                  style={{ position: "absolute", top: 8, right: 8, zIndex: 2 }}
+                >
                   <IconButton
                     ariaLabel="Remove from favorites"
                     icon={
@@ -125,9 +145,16 @@ export default function FavoritesPage() {
           </div>
         )}
 
-        <p style={{ marginTop: 24, fontSize: font.size.xs, color: colors.textFaint }}>
+        <p
+          style={{
+            marginTop: 24,
+            fontSize: font.size.xs,
+            color: colors.textFaint,
+          }}
+        >
           {/* Reminder for future work: wire this to a real "list favorites" endpoint when available. */}
-          Note: this list is populated locally after you save items in the same session.
+          Note: this list is populated locally after you save items in the same
+          session.
         </p>
       </Container>
     </div>

@@ -3,7 +3,13 @@ import { colors } from "./theme";
 type Size = "xs" | "sm" | "md" | "lg";
 const px: Record<Size, number> = { xs: 12, sm: 14, md: 20, lg: 32 };
 
-export function Spinner({ size = "md", color = colors.primary }: { size?: Size; color?: string }) {
+export function Spinner({
+  size = "md",
+  color = colors.primary,
+}: {
+  size?: Size;
+  color?: string;
+}) {
   const s = px[size];
   const border = Math.max(2, Math.round(s / 8));
   return (

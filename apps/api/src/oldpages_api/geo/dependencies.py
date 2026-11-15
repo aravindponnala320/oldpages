@@ -5,7 +5,7 @@ from __future__ import annotations
 import base64
 import json
 import logging
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import Depends, Header, Request
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -68,7 +68,10 @@ GeoServiceDep = Annotated[GeoService, Depends(get_geo_service)]
 
 def client_ip(request: Request) -> str | None:
     from oldpages_api.geo.ip import extract_client_ip
+    from oldpages_api.identity.dependencies import client_ip as trusted_client_ip
 
+    if request.app.state.settings.client_ip_header:
+        return trusted_client_ip(request)
     fallback = request.client.host if request.client else None
     return extract_client_ip(dict(request.headers), fallback)
 

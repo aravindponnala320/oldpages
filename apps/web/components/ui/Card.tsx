@@ -18,18 +18,18 @@ type CardProps = {
 
 const paddings: Record<Padding, string> = {
   none: "0",
-  sm:   "12px",
-  md:   "16px",
-  lg:   "24px",
+  sm: "12px",
+  md: "16px",
+  lg: "24px",
 };
 
 const tones: Record<Tone, { bg: string; border: string }> = {
-  default: { bg: colors.surface,      border: colors.border },
-  muted:   { bg: colors.surfaceMuted, border: colors.border },
-  brand:   { bg: colors.primarySoft,  border: "#c7dbff" },
-  success: { bg: colors.successSoft,  border: "#bbf7d0" },
-  warning: { bg: colors.warningSoft,  border: "#fde68a" },
-  danger:  { bg: colors.dangerSoft,   border: "#fecaca" },
+  default: { bg: colors.surface, border: colors.border },
+  muted: { bg: colors.surfaceMuted, border: colors.border },
+  brand: { bg: colors.primarySoft, border: "#c7dbff" },
+  success: { bg: colors.successSoft, border: "#bbf7d0" },
+  warning: { bg: colors.warningSoft, border: "#fde68a" },
+  danger: { bg: colors.dangerSoft, border: "#fecaca" },
 };
 
 export function Card({

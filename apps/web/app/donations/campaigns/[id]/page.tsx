@@ -38,7 +38,14 @@ type PledgeForm = {
 function ProgressBar({ value, max }: { value: number; max: number }) {
   const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0;
   return (
-    <div style={{ background: colors.surfaceMuted, borderRadius: radius.pill, height: 8, overflow: "hidden" }}>
+    <div
+      style={{
+        background: colors.surfaceMuted,
+        borderRadius: radius.pill,
+        height: 8,
+        overflow: "hidden",
+      }}
+    >
       <div
         style={{
           height: "100%",
@@ -58,11 +65,16 @@ export default function CampaignDetailPage() {
   const router = useRouter();
   const { toast } = useToast();
 
-  const [campaign, setCampaign] = useState<Campaign>(null);
+  const [campaign] = useState<Campaign>(null);
   const [loading, setLoading] = useState(true);
   const [pledging, setPledging] = useState(false);
   const [pledgeSuccess, setPledgeSuccess] = useState(false);
-  const [form, setForm] = useState<PledgeForm>({ needId: "", condition: "good", quantity: "1", notes: "" });
+  const [form, setForm] = useState<PledgeForm>({
+    needId: "",
+    condition: "good",
+    quantity: "1",
+    notes: "",
+  });
 
   useEffect(() => {
     // No campaign lookup endpoint yet. When one lands, fetch by id here.
@@ -71,7 +83,10 @@ export default function CampaignDetailPage() {
   }, [id]);
 
   const handlePledge = async () => {
-    if (!isAuthenticated) { router.push("/"); return; }
+    if (!isAuthenticated) {
+      router.push("/");
+      return;
+    }
     if (!form.needId || !form.quantity) return;
     setPledging(true);
     try {
@@ -86,7 +101,9 @@ export default function CampaignDetailPage() {
 
   if (loading) {
     return (
-      <div style={{ display: "flex", justifyContent: "center", paddingTop: 60 }}>
+      <div
+        style={{ display: "flex", justifyContent: "center", paddingTop: 60 }}
+      >
         <Spinner size="lg" />
       </div>
     );
@@ -96,7 +113,12 @@ export default function CampaignDetailPage() {
     return (
       <div style={{ padding: "24px 0 40px" }}>
         <Container maxWidth={760}>
-          <Button variant="ghost" size="sm" onClick={() => router.back()} style={{ marginBottom: 12 }}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.back()}
+            style={{ marginBottom: 12 }}
+          >
             ← Back
           </Button>
           <EmptyState
@@ -117,7 +139,12 @@ export default function CampaignDetailPage() {
   const _unused = (
     <div style={{ padding: "24px 0 40px" }}>
       <Container maxWidth={760}>
-        <Button variant="ghost" size="sm" onClick={() => router.back()} style={{ marginBottom: 12 }}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => router.back()}
+          style={{ marginBottom: 12 }}
+        >
           ← Back
         </Button>
         <div style={{ marginBottom: 16 }}>
@@ -127,22 +154,37 @@ export default function CampaignDetailPage() {
         </div>
         <Section title="Pledge books">
           {pledgeSuccess ? (
-            <div style={{ background: colors.successSoft, color: colors.successText, borderRadius: radius.lg, padding: 14 }}>
-              <p style={{ margin: 0, fontWeight: font.weight.semibold }}>Thank you for your pledge!</p>
-              <p style={{ margin: "4px 0 0", fontSize: font.size.sm }}>The organizer will contact you shortly.</p>
+            <div
+              style={{
+                background: colors.successSoft,
+                color: colors.successText,
+                borderRadius: radius.lg,
+                padding: 14,
+              }}
+            >
+              <p style={{ margin: 0, fontWeight: font.weight.semibold }}>
+                Thank you for your pledge!
+              </p>
+              <p style={{ margin: "4px 0 0", fontSize: font.size.sm }}>
+                The organizer will contact you shortly.
+              </p>
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <Select
                 label="Book needed"
                 value={form.needId}
-                onChange={(e) => setForm((f) => ({ ...f, needId: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, needId: e.target.value }))
+                }
                 options={[]}
               />
               <Select
                 label="Condition"
                 value={form.condition}
-                onChange={(e) => setForm((f) => ({ ...f, condition: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, condition: e.target.value }))
+                }
                 options={[
                   { value: "new_sealed", label: "New / Sealed" },
                   { value: "like_new", label: "Like New" },
@@ -156,16 +198,25 @@ export default function CampaignDetailPage() {
                 type="number"
                 min={1}
                 value={form.quantity}
-                onChange={(e) => setForm((f) => ({ ...f, quantity: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, quantity: e.target.value }))
+                }
               />
               <Textarea
                 label="Notes (optional)"
                 rows={2}
                 placeholder="Any notes about the book's condition..."
                 value={form.notes}
-                onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, notes: e.target.value }))
+                }
               />
-              <Button variant="primary" loading={pledging} onClick={handlePledge} disabled={!isAuthenticated}>
+              <Button
+                variant="primary"
+                loading={pledging}
+                onClick={handlePledge}
+                disabled={!isAuthenticated}
+              >
                 Pledge Books
               </Button>
             </div>

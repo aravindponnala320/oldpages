@@ -24,8 +24,7 @@ import {
   useToast,
 } from "../../components/ui";
 import { getAccessToken } from "../../lib/auth";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+import { apiBaseUrl } from "../../lib/api";
 
 type BusinessStatus = "pending" | "active" | "rejected" | "suspended";
 
@@ -62,7 +61,7 @@ type BusinessProfile = {
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const token = getAccessToken();
-  const res = await fetch(`${API_BASE}/api/v1${path}`, {
+  const res = await fetch(`${apiBaseUrl}/api/v1${path}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -84,28 +83,40 @@ const ROLE_VARIANT: Record<string, "success" | "info" | "default"> = {
   staff: "default",
 };
 
-const STATUS_BANNER: Record<BusinessStatus, { bg: string; border: string; color: string; title: string; message?: string } | null> = {
+const STATUS_BANNER: Record<
+  BusinessStatus,
+  {
+    bg: string;
+    border: string;
+    color: string;
+    title: string;
+    message?: string;
+  } | null
+> = {
   active: null,
   pending: {
     bg: colors.warningSoft,
     border: colors.warning,
     color: colors.warningText,
     title: "Pending approval",
-    message: "Your business profile has been submitted and is awaiting moderator review. This usually takes 1–2 business days.",
+    message:
+      "Your business profile has been submitted and is awaiting moderator review. This usually takes 1–2 business days.",
   },
   rejected: {
     bg: colors.dangerSoft,
     border: colors.danger,
     color: colors.dangerText,
     title: "Application rejected",
-    message: "Your application was not approved. Please review your details and resubmit.",
+    message:
+      "Your application was not approved. Please review your details and resubmit.",
   },
   suspended: {
     bg: colors.dangerSoft,
     border: colors.danger,
     color: colors.dangerText,
     title: "Account suspended",
-    message: "Your business profile has been suspended. Contact support for more information.",
+    message:
+      "Your business profile has been suspended. Contact support for more information.",
   },
 };
 
@@ -114,7 +125,9 @@ export default function BusinessPage() {
   const router = useRouter();
   const { toast } = useToast();
 
-  const [profile, setProfile] = useState<BusinessProfile | null | undefined>(undefined);
+  const [profile, setProfile] = useState<BusinessProfile | null | undefined>(
+    undefined,
+  );
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
@@ -154,7 +167,9 @@ export default function BusinessPage() {
       const data = await apiFetch<BusinessProfile | null>("/business/me");
       setProfile(data);
       if (data?.id) {
-        const staffData = await apiFetch<StaffMember[]>(`/business/${data.id}/staff`).catch(() => []);
+        const staffData = await apiFetch<StaffMember[]>(
+          `/business/${data.id}/staff`,
+        ).catch(() => []);
         setStaff(staffData);
         setLocations([]);
       }
@@ -186,7 +201,9 @@ export default function BusinessPage() {
       await fetchProfile();
       toast("Profile submitted for approval", "success");
     } catch (err) {
-      setCreateError(err instanceof Error ? err.message : "Failed to create profile");
+      setCreateError(
+        err instanceof Error ? err.message : "Failed to create profile",
+      );
     } finally {
       setCreating(false);
     }
@@ -198,14 +215,20 @@ export default function BusinessPage() {
     try {
       await apiFetch(`/business/${profile.id}/staff`, {
         method: "POST",
-        body: JSON.stringify({ user_id: inviteUserId.trim(), role: inviteRole }),
+        body: JSON.stringify({
+          user_id: inviteUserId.trim(),
+          role: inviteRole,
+        }),
       });
       setShowInviteModal(false);
       setInviteUserId("");
       await fetchProfile();
       toast("Invitation sent", "success");
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Failed to invite staff", "error");
+      toast(
+        err instanceof Error ? err.message : "Failed to invite staff",
+        "error",
+      );
     } finally {
       setInviteLoading(false);
     }
@@ -226,11 +249,17 @@ export default function BusinessPage() {
         }),
       });
       setShowLocationModal(false);
-      setLocName(""); setLocAddress(""); setLocCity(""); setLocState("");
+      setLocName("");
+      setLocAddress("");
+      setLocCity("");
+      setLocState("");
       await fetchProfile();
       toast("Location added", "success");
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Failed to add location", "error");
+      toast(
+        err instanceof Error ? err.message : "Failed to add location",
+        "error",
+      );
     } finally {
       setLocLoading(false);
     }
@@ -238,7 +267,9 @@ export default function BusinessPage() {
 
   if (isLoading || loading || profile === undefined) {
     return (
-      <div style={{ display: "flex", justifyContent: "center", paddingTop: 60 }}>
+      <div
+        style={{ display: "flex", justifyContent: "center", paddingTop: 60 }}
+      >
         <Spinner size="lg" />
       </div>
     );
@@ -262,32 +293,74 @@ export default function BusinessPage() {
           >
             <div
               style={{
-                width: 64, height: 64, borderRadius: "50%",
-                background: colors.primarySoft, display: "flex", alignItems: "center", justifyContent: "center",
+                width: 64,
+                height: 64,
+                borderRadius: "50%",
+                background: colors.primarySoft,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
                 margin: "0 auto 16px",
               }}
             >
               <Icon.book size={30} color={colors.primary} />
             </div>
-            <h1 style={{ margin: "0 0 8px", fontSize: font.size["2xl"], fontWeight: font.weight.bold, color: colors.text }}>
+            <h1
+              style={{
+                margin: "0 0 8px",
+                fontSize: font.size["2xl"],
+                fontWeight: font.weight.bold,
+                color: colors.text,
+              }}
+            >
               Create a Business Profile
             </h1>
-            <p style={{ color: colors.textSubtle, fontSize: font.size.base, margin: "0 0 20px", lineHeight: font.lineHeight.relaxed }}>
-              Run a bookstore, library, or book business? Create a profile to manage inventory, staff, and locations — pending moderator approval.
+            <p
+              style={{
+                color: colors.textSubtle,
+                fontSize: font.size.base,
+                margin: "0 0 20px",
+                lineHeight: font.lineHeight.relaxed,
+              }}
+            >
+              Run a bookstore, library, or book business? Create a profile to
+              manage inventory, staff, and locations — pending moderator
+              approval.
             </p>
-            <ul style={{ listStyle: "none", padding: 0, margin: "0 0 24px", textAlign: "left", display: "flex", flexDirection: "column", gap: 8 }}>
+            <ul
+              style={{
+                listStyle: "none",
+                padding: 0,
+                margin: "0 0 24px",
+                textAlign: "left",
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+              }}
+            >
               {[
                 "Manage multiple locations",
                 "Invite staff members",
                 "Bulk import inventory via CSV",
                 "Business analytics dashboard",
               ].map((f) => (
-                <li key={f} style={{ fontSize: font.size.base, display: "flex", alignItems: "center", gap: 8, color: colors.textMuted }}>
+                <li
+                  key={f}
+                  style={{
+                    fontSize: font.size.base,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    color: colors.textMuted,
+                  }}
+                >
                   <Icon.check size={16} color={colors.success} /> {f}
                 </li>
               ))}
             </ul>
-            <Button variant="primary" onClick={() => setShowCreateModal(true)}>Create Business Profile</Button>
+            <Button variant="primary" onClick={() => setShowCreateModal(true)}>
+              Create Business Profile
+            </Button>
           </div>
 
           <Modal
@@ -296,8 +369,18 @@ export default function BusinessPage() {
             title="Create Business Profile"
             footer={
               <>
-                <Button variant="secondary" onClick={() => setShowCreateModal(false)}>Cancel</Button>
-                <Button variant="primary" loading={creating} onClick={handleCreate} disabled={!createName.trim()}>
+                <Button
+                  variant="secondary"
+                  onClick={() => setShowCreateModal(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  loading={creating}
+                  onClick={handleCreate}
+                  disabled={!createName.trim()}
+                >
                   Submit for Approval
                 </Button>
               </>
@@ -305,7 +388,15 @@ export default function BusinessPage() {
           >
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {createError && (
-                <div style={{ background: colors.dangerSoft, color: colors.dangerText, padding: 10, borderRadius: radius.md, fontSize: font.size.sm }}>
+                <div
+                  style={{
+                    background: colors.dangerSoft,
+                    color: colors.dangerText,
+                    padding: 10,
+                    borderRadius: radius.md,
+                    fontSize: font.size.sm,
+                  }}
+                >
                   {createError}
                 </div>
               )}
@@ -320,10 +411,10 @@ export default function BusinessPage() {
                 value={createType}
                 onChange={(e) => setCreateType(e.target.value)}
                 options={[
-                  { value: "individual",  label: "Individual Seller" },
-                  { value: "shop",        label: "Book Shop" },
-                  { value: "publisher",   label: "Publisher" },
-                  { value: "library",     label: "Library" },
+                  { value: "individual", label: "Individual Seller" },
+                  { value: "shop", label: "Book Shop" },
+                  { value: "publisher", label: "Publisher" },
+                  { value: "library", label: "Library" },
                   { value: "institution", label: "Institution" },
                 ]}
               />
@@ -363,11 +454,26 @@ export default function BusinessPage() {
               marginBottom: 20,
             }}
           >
-            <p style={{ margin: "0 0 4px", fontWeight: font.weight.semibold, color: banner.color, fontSize: font.size.md }}>
+            <p
+              style={{
+                margin: "0 0 4px",
+                fontWeight: font.weight.semibold,
+                color: banner.color,
+                fontSize: font.size.md,
+              }}
+            >
               {banner.title}
             </p>
             {banner.message && (
-              <p style={{ margin: 0, fontSize: font.size.sm, color: banner.color }}>{banner.message}</p>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: font.size.sm,
+                  color: banner.color,
+                }}
+              >
+                {banner.message}
+              </p>
             )}
           </div>
         )}
@@ -379,7 +485,13 @@ export default function BusinessPage() {
           actions={
             <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
               <Badge
-                variant={profile.status === "active" ? "success" : profile.status === "pending" ? "warning" : "danger"}
+                variant={
+                  profile.status === "active"
+                    ? "success"
+                    : profile.status === "pending"
+                      ? "warning"
+                      : "danger"
+                }
                 label={profile.status}
               />
               {profile.is_verified && <Badge variant="info" label="Verified" />}
@@ -387,7 +499,15 @@ export default function BusinessPage() {
           }
         />
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 20 }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns:
+              "repeat(auto-fit, minmax(min(100%, 150px), 1fr))",
+            gap: 12,
+            marginBottom: 20,
+          }}
+        >
           <StatCard label="Active Listings" value={profile.listing_count} />
           <StatCard label="Staff Members" value={staff.length} />
           <StatCard label="Locations" value={locations.length} />
@@ -399,13 +519,25 @@ export default function BusinessPage() {
               <Section
                 title="Locations"
                 actions={
-                  <Button variant="secondary" size="sm" onClick={() => setShowLocationModal(true)}>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setShowLocationModal(true)}
+                  >
                     Add Location
                   </Button>
                 }
               >
                 {locations.length === 0 ? (
-                  <p style={{ color: colors.textSubtle, fontSize: font.size.base, margin: 0 }}>No locations yet.</p>
+                  <p
+                    style={{
+                      color: colors.textSubtle,
+                      fontSize: font.size.base,
+                      margin: 0,
+                    }}
+                  >
+                    No locations yet.
+                  </p>
                 ) : (
                   locations.map((loc) => (
                     <div
@@ -420,13 +552,33 @@ export default function BusinessPage() {
                     >
                       <Icon.pin color={colors.primary} />
                       <div style={{ flex: 1 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <span style={{ fontWeight: font.weight.semibold, fontSize: font.size.base, color: colors.text }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontWeight: font.weight.semibold,
+                              fontSize: font.size.base,
+                              color: colors.text,
+                            }}
+                          >
                             {loc.name}
                           </span>
-                          {loc.is_primary && <Badge variant="info" label="Primary" />}
+                          {loc.is_primary && (
+                            <Badge variant="info" label="Primary" />
+                          )}
                         </div>
-                        <p style={{ margin: 0, fontSize: font.size.sm, color: colors.textFaint }}>
+                        <p
+                          style={{
+                            margin: 0,
+                            fontSize: font.size.sm,
+                            color: colors.textFaint,
+                          }}
+                        >
                           {loc.address}, {loc.city}
                         </p>
                       </div>
@@ -439,13 +591,25 @@ export default function BusinessPage() {
             <Section
               title="Staff members"
               actions={
-                <Button variant="secondary" size="sm" onClick={() => setShowInviteModal(true)}>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setShowInviteModal(true)}
+                >
                   Invite Staff
                 </Button>
               }
             >
               {staff.length === 0 ? (
-                <p style={{ color: colors.textSubtle, fontSize: font.size.base, margin: 0 }}>No staff yet.</p>
+                <p
+                  style={{
+                    color: colors.textSubtle,
+                    fontSize: font.size.base,
+                    margin: 0,
+                  }}
+                >
+                  No staff yet.
+                </p>
               ) : (
                 staff.map((member) => (
                   <div
@@ -458,18 +622,42 @@ export default function BusinessPage() {
                       borderBottom: `1px solid ${colors.divider}`,
                     }}
                   >
-                    <Avatar name={`User ${member.user_id.slice(0, 4)}`} size="md" />
+                    <Avatar
+                      name={`User ${member.user_id.slice(0, 4)}`}
+                      size="md"
+                    />
                     <div style={{ flex: 1 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <span style={{ fontFamily: "monospace", fontSize: font.size.xs, color: colors.textMuted }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontFamily: "monospace",
+                            fontSize: font.size.xs,
+                            color: colors.textMuted,
+                          }}
+                        >
                           {member.user_id.slice(0, 12)}…
                         </span>
-                        <Badge variant={ROLE_VARIANT[member.role]} label={member.role} />
+                        <Badge
+                          variant={ROLE_VARIANT[member.role]}
+                          label={member.role}
+                        />
                       </div>
                     </div>
                     {member.invited_at && (
-                      <span style={{ fontSize: font.size.xs, color: colors.textFaint }}>
-                        Joined {new Date(member.invited_at).toLocaleDateString()}
+                      <span
+                        style={{
+                          fontSize: font.size.xs,
+                          color: colors.textFaint,
+                        }}
+                      >
+                        Joined{" "}
+                        {new Date(member.invited_at).toLocaleDateString()}
                       </span>
                     )}
                   </div>
@@ -493,8 +681,18 @@ export default function BusinessPage() {
           title="Invite Staff Member"
           footer={
             <>
-              <Button variant="secondary" onClick={() => setShowInviteModal(false)}>Cancel</Button>
-              <Button variant="primary" loading={inviteLoading} onClick={handleInviteStaff} disabled={!inviteUserId.trim()}>
+              <Button
+                variant="secondary"
+                onClick={() => setShowInviteModal(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                loading={inviteLoading}
+                onClick={handleInviteStaff}
+                disabled={!inviteUserId.trim()}
+              >
                 Send Invite
               </Button>
             </>
@@ -510,7 +708,9 @@ export default function BusinessPage() {
             <Select
               label="Role"
               value={inviteRole}
-              onChange={(e) => setInviteRole(e.target.value as typeof inviteRole)}
+              onChange={(e) =>
+                setInviteRole(e.target.value as typeof inviteRole)
+              }
               options={[
                 { value: "staff", label: "Staff" },
                 { value: "manager", label: "Manager" },
@@ -525,18 +725,48 @@ export default function BusinessPage() {
           title="Add Location"
           footer={
             <>
-              <Button variant="secondary" onClick={() => setShowLocationModal(false)}>Cancel</Button>
-              <Button variant="primary" loading={locLoading} onClick={handleAddLocation} disabled={!locName.trim() || !locCity.trim()}>
+              <Button
+                variant="secondary"
+                onClick={() => setShowLocationModal(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                loading={locLoading}
+                onClick={handleAddLocation}
+                disabled={!locName.trim() || !locCity.trim()}
+              >
                 Add Location
               </Button>
             </>
           }
         >
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <Input label="Location name *" value={locName} onChange={(e) => setLocName(e.target.value)} placeholder="e.g. Main Campus Store" />
-            <Input label="Address" value={locAddress} onChange={(e) => setLocAddress(e.target.value)} placeholder="Block A, Ground Floor" />
-            <Input label="City *" value={locCity} onChange={(e) => setLocCity(e.target.value)} placeholder="Pune" />
-            <Input label="State *" value={locState} onChange={(e) => setLocState(e.target.value)} placeholder="Maharashtra" />
+            <Input
+              label="Location name *"
+              value={locName}
+              onChange={(e) => setLocName(e.target.value)}
+              placeholder="e.g. Main Campus Store"
+            />
+            <Input
+              label="Address"
+              value={locAddress}
+              onChange={(e) => setLocAddress(e.target.value)}
+              placeholder="Block A, Ground Floor"
+            />
+            <Input
+              label="City *"
+              value={locCity}
+              onChange={(e) => setLocCity(e.target.value)}
+              placeholder="Pune"
+            />
+            <Input
+              label="State *"
+              value={locState}
+              onChange={(e) => setLocState(e.target.value)}
+              placeholder="Maharashtra"
+            />
           </div>
         </Modal>
       </Container>
@@ -556,10 +786,25 @@ function StatCard({ label, value }: { label: string; value: number }) {
         boxShadow: shadow.sm,
       }}
     >
-      <p style={{ margin: 0, fontSize: font.size["2xl"], fontWeight: font.weight.heavy, color: colors.text }}>
+      <p
+        style={{
+          margin: 0,
+          fontSize: font.size["2xl"],
+          fontWeight: font.weight.heavy,
+          color: colors.text,
+        }}
+      >
         {value.toLocaleString()}
       </p>
-      <p style={{ margin: "4px 0 0", fontSize: font.size.sm, color: colors.textSubtle }}>{label}</p>
+      <p
+        style={{
+          margin: "4px 0 0",
+          fontSize: font.size.sm,
+          color: colors.textSubtle,
+        }}
+      >
+        {label}
+      </p>
     </div>
   );
 }

@@ -4,6 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import AdminPage from "../app/page";
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
+}));
+
 describe("AdminPage", () => {
   beforeEach(() => {
     vi.stubGlobal(
@@ -25,7 +29,9 @@ describe("AdminPage", () => {
   it("renders the operations dashboard", async () => {
     render(createElement(AdminPage));
 
-    expect(screen.getByRole("heading", { level: 1, name: "Dashboard" })).toBeDefined();
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Dashboard" }),
+    ).toBeDefined();
     expect(await screen.findByText("Total Users")).toBeDefined();
     expect(screen.getByText("Active Listings")).toBeDefined();
     expect(screen.getByText("Recent Moderation Activity")).toBeDefined();

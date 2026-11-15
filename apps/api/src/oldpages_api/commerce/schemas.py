@@ -35,7 +35,7 @@ class ExchangeOfferItemInput(BaseModel):
 class OfferCreateRequest(BaseModel):
     amount_cents: int | None = Field(default=None, ge=0)
     bundle_listing_ids: list[str] = Field(default_factory=list, max_length=12)
-    currency: str = Field(default="INR", min_length=3, max_length=3)
+    currency: str = Field(default="INR", min_length=3, max_length=3)  # ignored: listing decides
     exchange_items: list[ExchangeOfferItemInput] = Field(default_factory=list, max_length=12)
     expires_at: datetime | None = None
     fulfillment_method: FulfillmentMethod = "pickup"
@@ -70,7 +70,7 @@ class OfferCreateRequest(BaseModel):
 
 class CounterOfferRequest(BaseModel):
     amount_cents: int = Field(ge=0)
-    currency: str = Field(default="INR", min_length=3, max_length=3)
+    currency: str = Field(default="INR", min_length=3, max_length=3)  # ignored: listing decides
     expires_at: datetime | None = None
     fulfillment_method: FulfillmentMethod | None = None
     message: str | None = Field(default=None, max_length=2000)

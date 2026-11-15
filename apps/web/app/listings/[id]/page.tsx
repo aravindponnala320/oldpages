@@ -1,8 +1,9 @@
-import { notFound } from "next/navigation";
 import Link from "next/link";
+import { ApiClientError } from "@oldpages/api-client";
 import { apiClient } from "../../../lib/api";
 import { ListingActions } from "./ListingActions";
 import { ListingMessagesTab } from "./ListingMessagesTab";
+import { OwnListingFallback } from "./OwnListingFallback";
 import type { ListingResponse, ConditionGrade } from "@oldpages/shared-types";
 import {
   Badge,
@@ -34,10 +35,18 @@ const MODE_LABEL: Record<string, string> = {
   giveaway: "Giveaway",
 };
 
-function ConditionDetails({ condition }: { condition: NonNullable<ListingResponse["condition"]> }) {
+function ConditionDetails({
+  condition,
+}: {
+  condition: NonNullable<ListingResponse["condition"]>;
+}) {
   const flags: string[] = [];
   if (condition.handwritten_notes) flags.push("Handwritten notes");
-  if (condition.highlighting_percent != null && condition.highlighting_percent > 0) flags.push(`${condition.highlighting_percent}% highlighted`);
+  if (
+    condition.highlighting_percent != null &&
+    condition.highlighting_percent > 0
+  )
+    flags.push(`${condition.highlighting_percent}% highlighted`);
   if (condition.torn_pages) flags.push("Torn pages");
   if (condition.water_damage) flags.push("Water damage");
   if (condition.stains) flags.push("Stains");
@@ -56,12 +65,24 @@ function ConditionDetails({ condition }: { condition: NonNullable<ListingRespons
         <ConditionBadge condition={condition.condition} size="md" />
       </div>
       {flags.length > 0 && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
-          {flags.map((flag) => <Badge key={flag} label={flag} />)}
+        <div
+          style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}
+        >
+          {flags.map((flag) => (
+            <Badge key={flag} label={flag} />
+          ))}
         </div>
       )}
       {condition.damage_details && (
-        <p style={{ margin: 0, fontSize: font.size.sm, color: colors.textSubtle }}>{condition.damage_details}</p>
+        <p
+          style={{
+            margin: 0,
+            fontSize: font.size.sm,
+            color: colors.textSubtle,
+          }}
+        >
+          {condition.damage_details}
+        </p>
       )}
     </div>
   );
@@ -73,44 +94,104 @@ export default async function ListingPage({ params }: ListingPageProps) {
   let listing: ListingResponse;
   try {
     listing = await apiClient.getListing(id);
-  } catch {
-    notFound();
+  } catch (err) {
+    if (!(err instanceof ApiClientError && err.status === 404)) throw err;
+    // Not public: drafts and private listings can only be opened by their seller, whose
+    // sign-in lives in the browser, so let the browser try.
+    return <OwnListingFallback listingId={id} />;
   }
 
-  const primaryImage = listing.images.find((img) => img.is_primary) ?? listing.images[0];
-  const otherImages = listing.images.filter((img) => img.id !== primaryImage?.id);
+  // "Academic & Educational › School Books › CBSE › Class 10 › Science", each step a search link.
+  const categoryPath = listing.category
+    ? await apiClient
+        .getCategoryLevels(listing.category.slug)
+        .then((r) => r.path)
+        .catch(() => [])
+    : [];
+
+  const primaryImage =
+    listing.images.find((img) => img.is_primary) ?? listing.images[0];
+  const otherImages = listing.images.filter(
+    (img) => img.id !== primaryImage?.id,
+  );
 
   const locationText = listing.location
-    ? [listing.location.neighborhood, listing.location.city, listing.location.state].filter(Boolean).join(", ")
+    ? [
+        listing.location.neighborhood,
+        listing.location.city,
+        listing.location.state,
+      ]
+        .filter(Boolean)
+        .join(", ")
     : null;
 
-  let relatedListings: { id: string; title: string; price_amount_cents: number | null; currency: string; condition: ConditionGrade | null }[] = [];
+  let relatedListings: {
+    id: string;
+    title: string;
+    price_amount_cents: number | null;
+    currency: string;
+    condition: ConditionGrade | null;
+  }[] = [];
   try {
-    const related = await apiClient.searchListings({ q: listing.book.title, limit: 4 });
-    relatedListings = related.items.filter((r) => r.id !== listing.id).slice(0, 4).map((r) => ({
-      id: r.id, title: r.title, price_amount_cents: r.price_amount_cents ?? null,
-      currency: r.currency, condition: r.condition ?? null,
-    }));
-  } catch { /* ignore */ }
+    const related = await apiClient.searchListings({
+      q: listing.book.title,
+      limit: 4,
+    });
+    relatedListings = related.items
+      .filter((r) => r.id !== listing.id)
+      .slice(0, 4)
+      .map((r) => ({
+        id: r.id,
+        title: r.title,
+        price_amount_cents: r.price_amount_cents ?? null,
+        currency: r.currency,
+        condition: r.condition ?? null,
+      }));
+  } catch {
+    /* ignore */
+  }
 
   return (
     <div style={{ padding: "20px 0 40px" }}>
       <Container>
         <nav
+          className="op-breadcrumb"
           style={{
-            display: "flex", alignItems: "center", gap: 6,
-            fontSize: font.size.sm, color: colors.textSubtle, marginBottom: 16,
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            fontSize: font.size.sm,
+            color: colors.textSubtle,
+            marginBottom: 16,
           }}
         >
-          <Link href="/" style={{ color: colors.textSubtle, textDecoration: "none" }}>Home</Link>
+          <Link
+            href="/"
+            style={{ color: colors.textSubtle, textDecoration: "none" }}
+          >
+            Home
+          </Link>
           <span>/</span>
-          <Link href="/search" style={{ color: colors.textSubtle, textDecoration: "none" }}>Listings</Link>
+          <Link
+            href="/search"
+            style={{ color: colors.textSubtle, textDecoration: "none" }}
+          >
+            Listings
+          </Link>
           <span>/</span>
           <span style={{ color: colors.text }}>{listing.title}</span>
         </nav>
 
-        <div style={{ display: "grid", gridTemplateColumns: "360px 1fr", gap: 32, alignItems: "flex-start" }}>
-          <div>
+        <div
+          className="op-split"
+          style={
+            {
+              "--op-side": "clamp(260px, 30vw, 360px)",
+              "--op-split-gap": "clamp(20px, 3vw, 32px)",
+            } as React.CSSProperties
+          }
+        >
+          <div className="op-split-media">
             <BookCover
               imageUrl={primaryImage?.public_url}
               title={listing.title}
@@ -118,7 +199,14 @@ export default async function ListingPage({ params }: ListingPageProps) {
               aspectRatio="3/4"
             />
             {otherImages.length > 0 && (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginTop: 12 }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(4, 1fr)",
+                  gap: 8,
+                  marginTop: 12,
+                }}
+              >
                 {otherImages.slice(0, 4).map((img) =>
                   img.public_url ? (
                     <div
@@ -131,7 +219,17 @@ export default async function ListingPage({ params }: ListingPageProps) {
                         background: colors.surfaceMuted,
                       }}
                     >
-                      <img src={img.public_url} alt={img.alt_text ?? listing.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      <img
+                        loading="lazy"
+                        decoding="async"
+                        src={img.public_url}
+                        alt={img.alt_text ?? listing.title}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                        }}
+                      />
                     </div>
                   ) : null,
                 )}
@@ -140,9 +238,20 @@ export default async function ListingPage({ params }: ListingPageProps) {
           </div>
 
           <div>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+            <div
+              style={{
+                display: "flex",
+                gap: 6,
+                flexWrap: "wrap",
+                marginBottom: 10,
+              }}
+            >
               {listing.listing_modes.map((mode) => (
-                <Badge key={mode} variant="info" label={MODE_LABEL[mode] ?? mode} />
+                <Badge
+                  key={mode}
+                  variant="info"
+                  label={MODE_LABEL[mode] ?? mode}
+                />
               ))}
             </div>
             <h1
@@ -156,8 +265,48 @@ export default async function ListingPage({ params }: ListingPageProps) {
             >
               {listing.title}
             </h1>
+            {categoryPath.length > 0 && (
+              <nav
+                aria-label="Category"
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                  gap: "2px 6px",
+                  margin: "0 0 6px",
+                  fontSize: font.size.sm,
+                  color: colors.textSubtle,
+                }}
+              >
+                {categoryPath.map((c, i) => (
+                  <span
+                    key={c.slug}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    {i > 0 && <span aria-hidden>›</span>}
+                    <Link
+                      href={`/search?category=${encodeURIComponent(c.slug)}`}
+                      style={{
+                        color: colors.textMuted,
+                        textDecoration: "none",
+                      }}
+                    >
+                      {c.name}
+                    </Link>
+                  </span>
+                ))}
+              </nav>
+            )}
             <p style={{ margin: "0 0 12px", fontSize: font.size.base }}>
-              <Link href={`/books/${listing.book.id}`} style={{ color: colors.primary, textDecoration: "none" }}>
+              <Link
+                className="op-tap"
+                href={`/books/${listing.book.id}`}
+                style={{ color: colors.primary, textDecoration: "none" }}
+              >
                 View book details
               </Link>
             </p>
@@ -170,11 +319,22 @@ export default async function ListingPage({ params }: ListingPageProps) {
                 marginBottom: 16,
               }}
             >
-              <span style={{ fontSize: font.size["3xl"], fontWeight: font.weight.heavy, color: colors.text, letterSpacing: "-0.02em" }}>
+              <span
+                style={{
+                  fontSize: font.size["3xl"],
+                  fontWeight: font.weight.heavy,
+                  color: colors.text,
+                  letterSpacing: "-0.02em",
+                }}
+              >
                 {formatPrice(listing.price_amount_cents, listing.currency)}
               </span>
               {listing.negotiable && (
-                <span style={{ fontSize: font.size.sm, color: colors.textSubtle }}>· Negotiable</span>
+                <span
+                  style={{ fontSize: font.size.sm, color: colors.textSubtle }}
+                >
+                  · Negotiable
+                </span>
               )}
             </div>
 
@@ -187,28 +347,72 @@ export default async function ListingPage({ params }: ListingPageProps) {
             )}
 
             {locationText && (
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  marginBottom: 12,
+                }}
+              >
                 <Icon.pin color={colors.textSubtle} />
-                <span style={{ color: colors.textMuted, fontSize: font.size.base }}>{locationText}</span>
-                {listing.location?.campus_pickup && <Badge variant="info" label="Campus Pickup" />}
+                <span
+                  style={{ color: colors.textMuted, fontSize: font.size.base }}
+                >
+                  {locationText}
+                </span>
+                {listing.location?.campus_pickup && (
+                  <Badge variant="info" label="Campus Pickup" />
+                )}
               </div>
             )}
 
             {listing.delivery_methods.length > 0 && (
               <div style={{ marginBottom: 12 }}>
                 <Section title="Delivery options">
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div
+                    style={{ display: "flex", flexDirection: "column", gap: 8 }}
+                  >
                     {listing.delivery_methods.map((dm) => (
-                      <div key={dm.method} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: font.size.base }}>
-                        <span style={{ color: colors.textMuted, fontWeight: font.weight.medium }}>
+                      <div
+                        key={dm.method}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          fontSize: font.size.base,
+                        }}
+                      >
+                        <span
+                          style={{
+                            color: colors.textMuted,
+                            fontWeight: font.weight.medium,
+                          }}
+                        >
                           {dm.method === "pickup" ? "Pickup" : "Shipping"}
                         </span>
-                        {dm.price_amount_cents != null && dm.price_amount_cents > 0 ? (
-                          <span style={{ color: colors.textSubtle }}>— ₹{(dm.price_amount_cents / 100).toLocaleString("en-IN")}</span>
+                        {dm.price_amount_cents != null &&
+                        dm.price_amount_cents > 0 ? (
+                          <span style={{ color: colors.textSubtle }}>
+                            —{" "}
+                            {formatPrice(
+                              dm.price_amount_cents,
+                              listing.currency,
+                            )}
+                          </span>
                         ) : dm.method === "shipping" ? (
                           <Badge variant="success" label="Free" />
                         ) : null}
-                        {dm.notes && <span style={{ color: colors.textFaint, fontSize: font.size.sm }}>({dm.notes})</span>}
+                        {dm.notes && (
+                          <span
+                            style={{
+                              color: colors.textFaint,
+                              fontSize: font.size.sm,
+                            }}
+                          >
+                            ({dm.notes})
+                          </span>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -223,7 +427,14 @@ export default async function ListingPage({ params }: ListingPageProps) {
         {listing.description && (
           <div style={{ marginTop: 24 }}>
             <Section title="Description">
-              <p style={{ margin: 0, lineHeight: font.lineHeight.relaxed, color: colors.text, fontSize: font.size.base }}>
+              <p
+                style={{
+                  margin: 0,
+                  lineHeight: font.lineHeight.relaxed,
+                  color: colors.text,
+                  fontSize: font.size.base,
+                }}
+              >
                 {listing.description}
               </p>
             </Section>
@@ -233,7 +444,13 @@ export default async function ListingPage({ params }: ListingPageProps) {
         {listing.exchange_preferences && (
           <div style={{ marginTop: 16 }}>
             <Section title="Exchange preferences">
-              <p style={{ margin: 0, lineHeight: font.lineHeight.relaxed, color: colors.textMuted }}>
+              <p
+                style={{
+                  margin: 0,
+                  lineHeight: font.lineHeight.relaxed,
+                  color: colors.textMuted,
+                }}
+              >
                 {listing.exchange_preferences}
               </p>
             </Section>
@@ -243,7 +460,13 @@ export default async function ListingPage({ params }: ListingPageProps) {
         {listing.return_policy && (
           <div style={{ marginTop: 16 }}>
             <Section title="Return policy">
-              <p style={{ margin: 0, lineHeight: font.lineHeight.relaxed, color: colors.textMuted }}>
+              <p
+                style={{
+                  margin: 0,
+                  lineHeight: font.lineHeight.relaxed,
+                  color: colors.textMuted,
+                }}
+              >
                 {listing.return_policy}
               </p>
             </Section>
@@ -251,13 +474,23 @@ export default async function ListingPage({ params }: ListingPageProps) {
         )}
 
         <div style={{ marginTop: 16 }}>
-          <ListingMessagesTab listingId={listing.id} sellerId={listing.seller.id} />
+          <ListingMessagesTab
+            listingId={listing.id}
+            sellerId={listing.seller.id}
+          />
         </div>
 
         {relatedListings.length > 0 && (
           <div style={{ marginTop: 24 }}>
             <Section title="More copies of this book">
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 14 }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns:
+                    "repeat(auto-fill, minmax(min(100%, clamp(120px, 22vw, 200px)), 1fr))",
+                  gap: 14,
+                }}
+              >
                 {relatedListings.map((r) => (
                   <Link
                     key={r.id}
@@ -273,11 +506,28 @@ export default async function ListingPage({ params }: ListingPageProps) {
                       gap: 6,
                     }}
                   >
-                    <p style={{ margin: 0, fontWeight: font.weight.semibold, fontSize: font.size.base, color: colors.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <p
+                      style={{
+                        margin: 0,
+                        fontWeight: font.weight.semibold,
+                        fontSize: font.size.base,
+                        color: colors.text,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
                       {r.title}
                     </p>
                     {r.condition && <ConditionBadge condition={r.condition} />}
-                    <p style={{ margin: "6px 0 0", fontSize: font.size.lg, fontWeight: font.weight.bold, color: colors.text }}>
+                    <p
+                      style={{
+                        margin: "6px 0 0",
+                        fontSize: font.size.lg,
+                        fontWeight: font.weight.bold,
+                        color: colors.text,
+                      }}
+                    >
                       {formatPrice(r.price_amount_cents, r.currency)}
                     </p>
                   </Link>

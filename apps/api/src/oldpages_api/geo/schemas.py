@@ -14,6 +14,7 @@ class LocationPayload(BaseModel):
 
     latitude: float = Field(ge=-90, le=90)
     longitude: float = Field(ge=-180, le=180)
+    locality: str | None = Field(default=None, max_length=120)  # area/suburb inside the city
     city: str | None = Field(default=None, max_length=120)
     state: str | None = Field(default=None, max_length=120)
     country: str | None = Field(default=None, max_length=80)
@@ -49,6 +50,7 @@ class GeoSearchItem(BaseModel):
     display_name: str
     latitude: float
     longitude: float
+    locality: str | None = None
     city: str | None = None
     state: str | None = None
     country: str | None = None

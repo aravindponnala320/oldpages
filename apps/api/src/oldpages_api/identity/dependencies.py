@@ -23,9 +23,19 @@ class CurrentPrincipal:
     user: User
 
 
+def client_ip(request: Request) -> str | None:
+    """The caller's IP. X-Forwarded-For is never trusted: clients can write it themselves."""
+    header = request.app.state.settings.client_ip_header
+    if header:
+        value = request.headers.get(header, "").strip()
+        if value:
+            return value
+    return request.client.host if request.client else None
+
+
 def request_context(request: Request) -> AuthenticatedRequestContext:
     return AuthenticatedRequestContext(
-        ip_address=request.client.host if request.client else None,
+        ip_address=client_ip(request),
         user_agent=request.headers.get("user-agent"),
     )
 

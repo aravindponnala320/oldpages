@@ -11,7 +11,9 @@ import type { AuthUser } from "@oldpages/shared-types";
 import { apiClient } from "../lib/api";
 import {
   clearTokens,
+  setViewerCookie,
   getAccessToken,
+  getRefreshToken,
   setTokens,
 } from "../lib/auth";
 
@@ -20,12 +22,9 @@ type AuthContextType = {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
-  register: (
-    name: string,
-    email: string,
-    password: string,
-  ) => Promise<void>;
+  logout: () => Promise<void>;
+  logoutAll: () => Promise<void>;
+  register: (name: string, email: string, password: string) => Promise<void>;
   loginWithGoogle: (idToken: string) => Promise<void>;
 };
 
@@ -34,6 +33,10 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!isLoading) setViewerCookie(user?.id ?? null);
+  }, [user, isLoading]);
 
   useEffect(() => {
     const token = getAccessToken();
@@ -66,7 +69,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(response.user);
   }, []);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    // Revoke the session server-side too; local sign-out proceeds even if this fails.
+    const refreshToken = getRefreshToken();
+    if (refreshToken)
+      await apiClient.logout(refreshToken).catch(() => undefined);
+    clearTokens();
+    setUser(null);
+    window.location.href = "/";
+  }, []);
+
+  const logoutAll = useCallback(async () => {
+    const accessToken = getAccessToken();
+    if (accessToken)
+      await apiClient.logoutAll(accessToken).catch(() => undefined);
     clearTokens();
     setUser(null);
     window.location.href = "/";
@@ -101,6 +117,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isAuthenticated: !!user,
         login,
         logout,
+        logoutAll,
         register,
         loginWithGoogle,
       }}

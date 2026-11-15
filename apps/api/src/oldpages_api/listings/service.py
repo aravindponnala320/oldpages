@@ -1,15 +1,21 @@
 from __future__ import annotations
 
+import asyncio
+import hashlib
 import re
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from typing import cast
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from oldpages_api.catalog.exceptions import CatalogEntryNotFoundError
 from oldpages_api.catalog.isbn import normalize_isbn
-from oldpages_api.catalog.models import BookEdition
+from oldpages_api.catalog.models import BookEdition, Category
 from oldpages_api.core.config import Settings
+from oldpages_api.geo import places
+from oldpages_api.geo.currency import currency_for_country
 from oldpages_api.identity.models import AuditLog, User
 from oldpages_api.identity.schemas import AuthenticatedRequestContext
 from oldpages_api.identity.security import utc_now
@@ -30,6 +36,7 @@ from oldpages_api.listings.exceptions import (
     MediaAssetNotFoundError,
     MediaValidationError,
 )
+from oldpages_api.listings.images import MAX_UPLOAD_BYTES, InvalidImageError, sanitize_image
 from oldpages_api.listings.models import (
     Listing,
     ListingCondition,
@@ -40,6 +47,13 @@ from oldpages_api.listings.models import (
     ListingPriceHistory,
     MediaAsset,
 )
+from oldpages_api.listings.object_storage import (
+    delete_object,
+    presigned_url,
+    public_object_url,
+    read_object,
+    write_object,
+)
 from oldpages_api.listings.permissions import require_listing_owner, require_media_owner
 from oldpages_api.listings.repository import ListingRepository
 from oldpages_api.listings.schemas import (
@@ -48,6 +62,7 @@ from oldpages_api.listings.schemas import (
     ConditionGrade,
     DeliveryMethod,
     ListingBookSummary,
+    ListingCategorySummary,
     ListingConditionInput,
     ListingConditionResponse,
     ListingCreateRequest,
@@ -117,7 +132,13 @@ class ListingService:
             headers={"Content-Type": payload.content_type},
             id=media_public_id,
             storage_key=storage_key,
-            upload_url=self.development_upload_url(storage_key),
+            upload_url=presigned_url(
+                self.settings,
+                "PUT",
+                storage_key,
+                endpoint=self.settings.object_storage_public_endpoint
+                or self.settings.object_storage_endpoint,
+            ),
         )
 
     async def complete_upload(
@@ -137,9 +158,38 @@ class ListingService:
             raise MediaValidationError("The upload URL has expired.")
         if payload.byte_size is not None and payload.byte_size != media.byte_size:
             raise MediaValidationError("Uploaded byte size does not match the requested upload.")
-        if payload.checksum_sha256 is not None:
-            media.checksum_sha256 = payload.checksum_sha256
-        media.status = "uploaded"
+        try:
+            uploaded = await read_object(
+                self.settings, media.storage_key, max_bytes=MAX_UPLOAD_BYTES
+            )
+        except ValueError:
+            uploaded = b"\0" * (MAX_UPLOAD_BYTES + 1)  # rejected below as too large
+        if uploaded is None:
+            raise MediaValidationError("The file was not uploaded.")
+        try:
+            clean = await asyncio.to_thread(sanitize_image, uploaded)
+        except InvalidImageError as error:
+            media.status = "rejected"
+            media.metadata_json = {**(media.metadata_json or {}), "rejected_reason": str(error)}
+            await self.repo.commit()
+            await delete_object(self.settings, media.storage_key)
+            raise MediaValidationError(str(error)) from error
+        await write_object(self.settings, media.storage_key, clean.data, clean.content_type)
+        media.byte_size = len(clean.data)
+        media.content_type = clean.content_type
+        media.checksum_sha256 = hashlib.sha256(clean.data).hexdigest()
+        media.metadata_json = {
+            **(media.metadata_json or {}),
+            "width": clean.width,
+            "height": clean.height,
+            "sanitized": True,
+        }
+        if self.settings.media_auto_approve:
+            # Skips the (not yet built) moderation step: the image is public immediately.
+            media.status = "approved"
+            media.public_url = public_object_url(self.settings, media.storage_key)
+        else:
+            media.status = "uploaded"
         await enqueue_media_processing(media.id)
         await self.audit(
             action=MEDIA_UPLOAD_COMPLETED,
@@ -160,13 +210,20 @@ class ListingService:
             payload.book_id, payload.isbn, payload.book_title, payload.book_author
         )
         validate_price_rules(payload.listing_modes, payload.price_amount_cents)
+        ensure_modes_enabled(payload.listing_modes, self.settings)
+        currency = listing_currency(
+            payload.location.country,
+            payload.currency if "currency" in payload.model_fields_set else None,
+        )
 
         # Resolve business/institution internal IDs from public IDs
         business_db_id: int | None = None
         institution_db_id: int | None = None
         if payload.scope == "business" and payload.business_profile_id:
             from sqlalchemy import select as sa_select
+
             from oldpages_api.business.models import BusinessProfile
+
             bp_result = await self.session.execute(
                 sa_select(BusinessProfile).where(
                     BusinessProfile.public_id == payload.business_profile_id,
@@ -177,11 +234,16 @@ class ListingService:
             bp = bp_result.scalar_one_or_none()
             if bp is None:
                 from oldpages_api.listings.exceptions import ListingValidationError
-                raise ListingValidationError("Active business profile not found or you are not the owner.")
+
+                raise ListingValidationError(
+                    "Active business profile not found or you are not the owner."
+                )
             business_db_id = bp.id
         if payload.scope == "institution" and payload.institution_id:
             from sqlalchemy import select as sa_select
+
             from oldpages_api.institutions.models import Institution
+
             inst_result = await self.session.execute(
                 sa_select(Institution).where(
                     Institution.public_id == payload.institution_id,
@@ -192,14 +254,19 @@ class ListingService:
             inst = inst_result.scalar_one_or_none()
             if inst is None:
                 from oldpages_api.listings.exceptions import ListingValidationError
-                raise ListingValidationError("Active institution not found or you are not the owner.")
+
+                raise ListingValidationError(
+                    "Active institution not found or you are not the owner."
+                )
             institution_db_id = inst.id
 
+        category = await self.resolve_category(payload.category)
         listing = Listing(
             book_edition_id=book_edition.id,
+            category_id=category.id if category else None,
             business_profile_id=business_db_id,
             institution_id=institution_db_id,
-            currency=payload.currency,
+            currency=currency,
             description=payload.description,
             exchange_preferences=payload.exchange_preferences,
             open_to_exchange=payload.open_to_exchange,
@@ -218,7 +285,8 @@ class ListingService:
         )
         self.repo.add(listing)
         await self.repo.flush()
-        self.repo.add(condition_from_input(payload.condition, listing.id))
+        if payload.condition is not None:
+            self.repo.add(condition_from_input(payload.condition, listing.id))
         self.repo.add(location_from_input(payload.location, listing.id))
         self.repo.add(
             ListingInventory(
@@ -233,7 +301,7 @@ class ListingService:
             self.repo.add(
                 ListingPriceHistory(
                     changed_by_user_id=actor.id,
-                    currency=payload.currency,
+                    currency=currency,
                     listing_id=listing.id,
                     new_amount_cents=payload.price_amount_cents,
                     old_amount_cents=None,
@@ -258,7 +326,9 @@ class ListingService:
         limit: int = 50,
     ) -> list[ListingResponse]:
         from sqlalchemy import select as sa_select
+
         from oldpages_api.listings.repository import ListingRepository
+
         repo = ListingRepository(self.session)
         stmt = (
             sa_select(Listing)
@@ -281,11 +351,64 @@ class ListingService:
                 loaded.append(listing_response(full))
         return loaded
 
-    async def get_listing(self, listing_id: str) -> ListingResponse:
+    async def get_listing(self, listing_id: str, viewer: User | None = None) -> ListingResponse:
         listing = await self.get_listing_model(listing_id)
-        if listing.status == "deleted":
+        if listing.status == "deleted" or not await self.can_view(listing, viewer):
+            # Same answer as a missing listing, so hidden ones can't be probed for.
             raise ListingNotFoundError()
         return listing_response(listing)
+
+    async def can_view(self, listing: Listing, viewer: User | None) -> bool:
+        if viewer is not None and viewer.id == listing.seller_user_id:
+            return True
+        if listing.status not in PUBLICLY_VISIBLE_STATUSES:
+            return False
+        if listing.visibility == "public":
+            return True
+        if viewer is None:
+            return False
+        if listing.visibility == "business_only" and listing.business_profile_id is not None:
+            from oldpages_api.business.models import BusinessProfile, StaffAccount
+
+            owner = await self.session.scalar(
+                select(BusinessProfile.owner_user_id).where(
+                    BusinessProfile.id == listing.business_profile_id
+                )
+            )
+            staff = await self.session.scalar(
+                select(StaffAccount.id).where(
+                    StaffAccount.business_profile_id == listing.business_profile_id,
+                    StaffAccount.user_id == viewer.id,
+                    StaffAccount.status == "active",
+                )
+            )
+            return owner == viewer.id or staff is not None
+        if listing.visibility == "institution_only" and listing.institution_id is not None:
+            from oldpages_api.institutions.models import Institution, InstitutionMember
+
+            owner = await self.session.scalar(
+                select(Institution.owner_user_id).where(Institution.id == listing.institution_id)
+            )
+            member = await self.session.scalar(
+                select(InstitutionMember.id).where(
+                    InstitutionMember.institution_id == listing.institution_id,
+                    InstitutionMember.user_id == viewer.id,
+                    InstitutionMember.status == "active",
+                )
+            )
+            return owner == viewer.id or member is not None
+        return False  # "private", or a scoped listing missing its business/institution
+
+    async def resolve_category(self, slug: str | None) -> Category | None:
+        if not slug:
+            return None
+        result = await self.session.execute(
+            select(Category).where(Category.slug == slug, Category.is_active.is_(True))
+        )
+        category = result.scalar_one_or_none()
+        if category is None:
+            raise ListingValidationError("That category doesn't exist. Pick one from the list.")
+        return category
 
     async def update_listing(
         self,
@@ -308,16 +431,26 @@ class ListingService:
             else listing.price_amount_cents
         )
         validate_price_rules(cast("list[ListingMode]", next_modes), next_price)
+        ensure_modes_enabled(next_modes, self.settings)
 
         old_price = listing.price_amount_cents
         if payload.listing_modes is not None:
             listing.listing_modes = list(payload.listing_modes)
+        if "category" in fields:
+            category = await self.resolve_category(payload.category)
+            listing.category_id = category.id if category else None
+            listing.category = category
         if "description" in fields:
             listing.description = payload.description
         if "price_amount_cents" in fields:
             listing.price_amount_cents = payload.price_amount_cents
-        if payload.currency is not None:
-            listing.currency = payload.currency
+        if payload.location is not None or payload.currency is not None:
+            country = (
+                payload.location.country
+                if payload.location is not None
+                else (listing.location.country if listing.location is not None else None)
+            )
+            listing.currency = listing_currency(country, payload.currency or listing.currency)
         if payload.negotiable is not None:
             listing.negotiable = payload.negotiable
         if "return_policy" in fields:
@@ -351,10 +484,25 @@ class ListingService:
                 await self.repo.flush()
             self.repo.add(condition_from_input(payload.condition, listing.id))
         if payload.location is not None:
-            if listing.location is not None:
-                await self.repo.delete(listing.location)
+            location_input = payload.location
+            previous = listing.location
+            if previous is not None:
+                # Edits that don't move the listing must keep its exact pickup point,
+                # which is never sent back to the browser.
+                if (
+                    location_input.exact_latitude is None
+                    and previous.exact_latitude is not None
+                    and places.normalise(location_input.city) == places.normalise(previous.city)
+                ):
+                    location_input = location_input.model_copy(
+                        update={
+                            "exact_latitude": previous.exact_latitude,
+                            "exact_longitude": previous.exact_longitude,
+                        }
+                    )
+                await self.repo.delete(previous)
                 await self.repo.flush()
-            self.repo.add(location_from_input(payload.location, listing.id))
+            self.repo.add(location_from_input(location_input, listing.id))
         if payload.delivery_methods is not None:
             listing.delivery_methods.clear()
             await self.repo.flush()
@@ -398,6 +546,7 @@ class ListingService:
                 f"Cannot publish a listing from status '{listing.status}'."
             )
         validate_publish_ready(listing)
+        ensure_modes_enabled(listing.listing_modes, self.settings)
         listing.status = "active"
         listing.published_at = utc_now()
         listing.paused_at = None
@@ -449,6 +598,7 @@ class ListingService:
                 "Only paused or expired listings can be relisted."
             )
         validate_publish_ready(listing)
+        ensure_modes_enabled(listing.listing_modes, self.settings)
         listing.status = "active"
         listing.published_at = utc_now()
         listing.paused_at = None
@@ -530,10 +680,12 @@ class ListingService:
         author: str | None = None,
         isbn: str | None = None,
     ) -> BookEdition:
-        from sqlalchemy import select as sa_select
-        from oldpages_api.catalog.models import Author, Book, BookAuthor, BookIdentifier
-
         import hashlib
+
+        from sqlalchemy import select as sa_select
+
+        from oldpages_api.catalog.exceptions import InvalidIsbnError
+        from oldpages_api.catalog.models import Author, Book, BookAuthor, BookIdentifier
 
         def _normalize(v: str) -> str:
             return " ".join(v.strip().casefold().split())
@@ -541,6 +693,12 @@ class ListingService:
         def _fingerprint(t: str, a: str | None, fmt: str, lang: str) -> str:
             raw = "|".join([_normalize(t), _normalize(a or ""), "", "", "", lang, fmt])
             return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+        # Reuse the edition another listing already created for this title/author.
+        fingerprint = _fingerprint(title, author, "paperback", "en")
+        existing = await self.repo.get_book_edition_by_fingerprint(fingerprint)
+        if existing is not None:
+            return existing
 
         # Create a Book record first, then a BookEdition linked to it
         book = Book(title=title, normalized_title=_normalize(title))
@@ -552,10 +710,9 @@ class ListingService:
             title=title,
             format="paperback",
             language="en",
-            edition_fingerprint=_fingerprint(title, author, "paperback", "en"),
+            edition_fingerprint=fingerprint,
         )
         edition.identifiers = []
-        edition.authors = []
         self.session.add(edition)
         await self.session.flush()
 
@@ -569,16 +726,16 @@ class ListingService:
                         value=normalized.value,
                     )
                 )
-            except Exception:
-                pass
+            except InvalidIsbnError:
+                pass  # keep the listing; the title is enough to find it
 
         if author:
             result = await self.session.execute(
-                sa_select(Author).where(Author.name == author.strip())
+                sa_select(Author).where(Author.normalized_name == _normalize(author))
             )
             author_obj = result.scalar_one_or_none()
             if author_obj is None:
-                author_obj = Author(name=author.strip())
+                author_obj = Author(name=author.strip(), normalized_name=_normalize(author))
                 self.session.add(author_obj)
                 await self.session.flush()
             self.session.add(BookAuthor(book_id=book.id, author_id=author_obj.id, position=1))
@@ -642,11 +799,6 @@ class ListingService:
             )
         )
 
-    def development_upload_url(self, storage_key: str) -> str:
-        endpoint = self.settings.object_storage_endpoint.rstrip("/")
-        bucket = self.settings.object_storage_bucket
-        return f"{endpoint}/{bucket}/{storage_key}?upload=development"
-
 
 def ensure_editable(listing: Listing) -> None:
     if listing.status in {"deleted", "reserved", "completed", "suspended"}:
@@ -656,7 +808,7 @@ def ensure_editable(listing: Listing) -> None:
 
 
 def validate_publish_ready(listing: Listing) -> None:
-    if listing.condition is None:
+    if listing.condition is None and set(listing.listing_modes) != {"request"}:
         raise ListingValidationError("Condition details are required before publishing.")
     if listing.location is None:
         raise ListingValidationError("Approximate listing location is required before publishing.")
@@ -692,11 +844,34 @@ def condition_from_input(payload: ListingConditionInput, listing_id: int) -> Lis
     return ListingCondition(listing_id=listing_id, **payload.model_dump())
 
 
+def listing_currency(country: str | None, requested: str | None) -> str:
+    """Prices are in the currency of the country the book is in; the seller's choice
+    only counts where we don't know the country's currency."""
+    return currency_for_country(country) or requested or "USD"
+
+
+def ensure_modes_enabled(modes: Sequence[str], settings: Settings) -> None:
+    if set(modes) & set(settings.disabled_listing_modes):
+        raise ListingValidationError("Lending, renting and book requests are not available yet.")
+
+
 def location_from_input(payload: ListingLocationInput, listing_id: int) -> ListingLocation:
     values = payload.model_dump()
+    if payload.country.upper() in {"IN", "INDIA"}:
+        # One spelling per city/state ("Bangalore" -> "Bengaluru") keeps city filters exact,
+        # and a listing without a picked point still gets its city's coordinates so the
+        # "near me" radius filter can find it.
+        values["state"] = places.canonical_state(payload.state)
+        values["city"] = places.canonical_city(payload.city, values["state"]) or payload.city
+        if payload.exact_latitude is None or payload.exact_longitude is None:
+            place = places.find(values["city"], values["state"])
+            if place is not None:
+                values["exact_latitude"] = str(place.latitude)
+                values["exact_longitude"] = str(place.longitude)
+                values["state"] = values["state"] or place.state
     public_latitude, public_longitude = approximate_public_coordinates(
-        payload.exact_latitude,
-        payload.exact_longitude,
+        values["exact_latitude"],
+        values["exact_longitude"],
     )
     values["public_latitude"] = public_latitude
     values["public_longitude"] = public_longitude
@@ -767,9 +942,10 @@ def calculate_quality_score(listing: Listing) -> int:
 def calculate_create_quality_score(payload: ListingCreateRequest, book_edition: BookEdition) -> int:
     score = 0
     score += min(len(payload.images), 4) * 5
-    score += 10
-    if condition_has_detail(payload.condition):
+    if payload.condition is not None:
         score += 10
+        if condition_has_detail(payload.condition):
+            score += 10
     if book_edition.identifiers:
         score += 15
     if payload.description:
@@ -812,10 +988,20 @@ def condition_has_detail(condition: ListingConditionInput) -> bool:
     return any(value is not None for value in values) or any(flags)
 
 
+# Statuses anyone may open by link: live, on hold for a buyer, or sold. Drafts, paused,
+# expired and moderated listings are only for their seller.
+PUBLICLY_VISIBLE_STATUSES = frozenset({"active", "reserved", "completed"})
+
+
 def listing_response(listing: Listing) -> ListingResponse:
     return ListingResponse(
         book=ListingBookSummary(
             id=listing.book_edition.public_id, title=listing.book_edition.title
+        ),
+        category=(
+            ListingCategorySummary(name=listing.category.name, slug=listing.category.slug)
+            if listing.category
+            else None
         ),
         condition=condition_response(listing.condition),
         created_at=listing.created_at,

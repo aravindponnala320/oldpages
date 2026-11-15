@@ -261,6 +261,9 @@ class ChatService:
         reloaded = await self.get_chat_request_model(chat_request.public_id)
         return chat_request_response(reloaded)
 
+    async def conversation_ids(self, actor: User) -> list[str]:
+        return await self.repo.conversation_public_ids(actor.id)
+
     async def list_conversations(
         self,
         actor: User,
@@ -272,7 +275,9 @@ class ChatService:
         listing_db_id: int | None = None
         if listing_id:
             from sqlalchemy import select as sa_select
+
             from oldpages_api.listings.models import Listing
+
             res = await self.repo.session.execute(
                 sa_select(Listing.id).where(Listing.public_id == listing_id)
             )
@@ -571,11 +576,13 @@ def conversation_response(conversation: Conversation, actor_user_id: int) -> Con
         display_name = None
         if hasattr(member.user, "profile") and member.user.profile:
             display_name = member.user.profile.display_name
-        members_resp.append(ConversationMemberResponse(
-            role=cast("ConversationMemberRole", member.role),
-            status=cast("ConversationMemberStatus", member.status),
-            user=UserSummary(id=member.user.public_id, display_name=display_name),
-        ))
+        members_resp.append(
+            ConversationMemberResponse(
+                role=cast("ConversationMemberRole", member.role),
+                status=cast("ConversationMemberStatus", member.status),
+                user=UserSummary(id=member.user.public_id, display_name=display_name),
+            )
+        )
 
     return ConversationResponse(
         created_at=conversation.created_at,

@@ -2,13 +2,29 @@ import type { CSSProperties } from "react";
 
 type Size = "xs" | "sm" | "md" | "lg" | "xl";
 const dims: Record<Size, number> = { xs: 24, sm: 32, md: 40, lg: 56, xl: 72 };
-const fontSizes: Record<Size, number> = { xs: 10, sm: 12, md: 14, lg: 18, xl: 22 };
+const fontSizes: Record<Size, number> = {
+  xs: 10,
+  sm: 12,
+  md: 14,
+  lg: 18,
+  xl: 22,
+};
 
-const PALETTE = ["#2563eb", "#0891b2", "#a15c16", "#7c3aed", "#b42318", "#0f766e", "#1d4ed8", "#c026d3"];
+const PALETTE = [
+  "#2563eb",
+  "#0891b2",
+  "#a15c16",
+  "#7c3aed",
+  "#b42318",
+  "#0f766e",
+  "#1d4ed8",
+  "#c026d3",
+];
 
 function colorFromName(name: string): string {
   let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  for (let i = 0; i < name.length; i++)
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
   return PALETTE[Math.abs(hash) % PALETTE.length] ?? PALETTE[0]!;
 }
 
@@ -53,7 +69,13 @@ export function Avatar({
       }}
     >
       {src ? (
-        <img src={src} alt={name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        <img
+          loading="lazy"
+          decoding="async"
+          src={src}
+          alt={name}
+          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        />
       ) : (
         getInitials(name)
       )}

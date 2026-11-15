@@ -1,6 +1,12 @@
 "use client";
 
-import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useState,
+  type ReactNode,
+} from "react";
 import { colors, font, radius, shadow, zIndex } from "./theme";
 import { Icon } from "./Icon";
 
@@ -12,11 +18,22 @@ type ToastContextType = { toast: (message: string, type?: ToastType) => void };
 const ToastContext = createContext<ToastContextType | null>(null);
 let nextId = 0;
 
-const toneMap: Record<ToastType, { bg: string; color: string; border: string }> = {
-  success: { bg: colors.successSoft, color: colors.successText, border: "#bbf7d0" },
-  error:   { bg: colors.dangerSoft,  color: colors.dangerText,  border: "#fecaca" },
-  info:    { bg: colors.infoSoft,    color: colors.infoText,    border: "#bae6fd" },
-  warning: { bg: colors.warningSoft, color: colors.warningText, border: "#fde68a" },
+const toneMap: Record<
+  ToastType,
+  { bg: string; color: string; border: string }
+> = {
+  success: {
+    bg: colors.successSoft,
+    color: colors.successText,
+    border: "#bbf7d0",
+  },
+  error: { bg: colors.dangerSoft, color: colors.dangerText, border: "#fecaca" },
+  info: { bg: colors.infoSoft, color: colors.infoText, border: "#bae6fd" },
+  warning: {
+    bg: colors.warningSoft,
+    color: colors.warningText,
+    border: "#fde68a",
+  },
 };
 
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -28,7 +45,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setTimeout(() => setToasts((p) => p.filter((t) => t.id !== id)), 4000);
   }, []);
 
-  const dismiss = (id: number) => setToasts((p) => p.filter((t) => t.id !== id));
+  const dismiss = (id: number) =>
+    setToasts((p) => p.filter((t) => t.id !== id));
 
   return (
     <ToastContext.Provider value={{ toast }}>
@@ -37,9 +55,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         <div
           aria-live="polite"
           style={{
-            position: "fixed", top: 16, right: 16,
-            display: "flex", flexDirection: "column", gap: 8,
-            zIndex: zIndex.toast, maxWidth: 400,
+            position: "fixed",
+            top: 16,
+            right: 16,
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+            zIndex: zIndex.toast,
+            maxWidth: 400,
           }}
         >
           {toasts.map((t) => {
@@ -49,12 +72,17 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 key={t.id}
                 role="alert"
                 style={{
-                  background: tone.bg, color: tone.color,
+                  background: tone.bg,
+                  color: tone.color,
                   border: `1px solid ${tone.border}`,
-                  borderRadius: radius.lg, padding: "10px 14px",
+                  borderRadius: radius.lg,
+                  padding: "10px 14px",
                   boxShadow: shadow.md,
-                  display: "flex", alignItems: "center", gap: 10,
-                  fontSize: font.size.base, fontWeight: font.weight.medium,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  fontSize: font.size.base,
+                  fontWeight: font.weight.medium,
                 }}
               >
                 <span style={{ flex: 1 }}>{t.message}</span>
@@ -62,8 +90,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                   onClick={() => dismiss(t.id)}
                   aria-label="Dismiss"
                   style={{
-                    background: "transparent", border: "none", cursor: "pointer",
-                    padding: 2, display: "inline-flex",
+                    background: "transparent",
+                    border: "none",
+                    cursor: "pointer",
+                    padding: 2,
+                    display: "inline-flex",
                   }}
                 >
                   <Icon.x color={tone.color} size={16} />
